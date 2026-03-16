@@ -136,11 +136,22 @@ class ProjectSiteForm(FlaskForm):
     submit = SubmitField('Save Project Site')
 
 
+CONSUMABLE_MOVEMENT_TYPES = {
+    'delivery': 'Delivery (Inflow from Vendor)',
+    'transfer': 'Transfer (Warehouse → Site)',
+    'pullout': 'Pullout (Return from Site to Warehouse)',
+    'consumption': 'Consumption (Used up at Site)',
+    'adjustment': 'Adjustment',
+    'return': 'Return to Vendor',
+    'scrap': 'Scrap / Disposal',
+}
+
+
 class MovementForm(FlaskForm):
     movement_type = SelectField('Transaction Type',
-        choices=[(k, v) for k, v in MOVEMENT_TYPES.items()],
+        choices=[(k, v) for k, v in CONSUMABLE_MOVEMENT_TYPES.items()],
         validators=[DataRequired()])
-    item_id = SelectField('Item / Asset', coerce=int, validators=[DataRequired()])
+    item_id = SelectField('Material / Consumable Item', coerce=int, validators=[DataRequired()])
     quantity = DecimalField('Quantity', validators=[DataRequired(), NumberRange(min=0.001)])
     unit_cost = DecimalField('Unit Cost', default=0, validators=[Optional(), NumberRange(min=0)])
 
@@ -157,7 +168,7 @@ class MovementForm(FlaskForm):
         ('warehouse', 'Warehouse'),
         ('site', 'Project Site'),
         ('external', 'External / Disposed'),
-        ('none', 'N/A'),
+        ('none', 'N/A (Consumed / Scrapped)'),
     ], default='warehouse')
     to_warehouse_id = SelectField('Destination Warehouse', coerce=int, validators=[Optional()])
     to_site_id = SelectField('Destination Site', coerce=int, validators=[Optional()])
@@ -169,7 +180,10 @@ class MovementForm(FlaskForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from app.models import Item, Warehouse, ProjectSite
-        self.item_id.choices = [(i.id, f"{i.name} [{i.sku}]") for i in Item.query.filter_by(is_active=True).order_by('name').all()]
+        self.item_id.choices = [
+            (i.id, f"{i.name} [{i.sku}]")
+            for i in Item.query.filter_by(is_active=True, item_type='consumable').order_by('name').all()
+        ]
         wh = [(0, '— Select —')] + [(w.id, w.name) for w in Warehouse.query.filter_by(is_active=True).order_by('name').all()]
         st = [(0, '— Select —')] + [(s.id, s.name) for s in ProjectSite.query.order_by('name').all()]
         self.from_warehouse_id.choices = wh

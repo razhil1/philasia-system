@@ -4,8 +4,23 @@
 {% block content %}
 <div class="page-header">
     <h1>{{ title }}</h1>
-    <p>Post a new inventory transaction to the ledger.</p>
+    <p>Post a new transaction for <strong>materials and consumable items</strong> to the ledger.</p>
 </div>
+
+<!-- Info banner: this form is for consumables only -->
+<div class="alert d-flex align-items-start gap-3 mb-4" style="background:#fffbeb;border:1px solid #fcd34d;">
+    <i class="bi bi-exclamation-triangle-fill text-warning mt-1 flex-shrink-0"></i>
+    <div>
+        <strong>This form is for Materials &amp; Consumables only</strong> (cement, rebar, fuel, paint, etc.).
+        <br>
+        For <strong>Tools, Equipment, and Non-Consumables</strong>, please use their individual
+        <strong>Asset Unit Management</strong> page — each physical unit is tracked by its own asset tag and
+        must be <em>Transferred</em> or <em>Pulled out</em>, never consumed.
+        <br class="d-none d-md-block">
+        <a href="{{ url_for('main.item_list') }}" class="alert-link">Browse Items &amp; Assets →</a>
+    </div>
+</div>
+
 <div class="row justify-content-center">
 <div class="col-lg-8">
 <form method="POST" id="movForm">
@@ -17,10 +32,12 @@
                 <div class="col-md-6">
                     <label class="form-label">{{ form.movement_type.label.text }}</label>
                     {{ form.movement_type(class='form-select', id='mtype') }}
+                    <div class="form-text" id="mtypeDesc"></div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">{{ form.item_id.label.text }}</label>
                     {{ form.item_id(class='form-select', id='itemSel') }}
+                    <div class="form-text text-muted">Only consumable / material items are listed here.</div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">{{ form.quantity.label.text }}</label>
@@ -91,6 +108,20 @@
         <i class="bi bi-info-circle me-2"></i><span id="stockInfoText"></span>
     </div>
 
+    <!-- Consumption notice -->
+    <div id="consumptionNote" class="alert d-none mb-3" style="background:#fff1f2;border:1px solid #fda4af;">
+        <i class="bi bi-fire me-2 text-danger"></i>
+        <strong>Consumption:</strong> This records materials that have been <em>fully used up</em> at the project site
+        and cannot be returned. The quantity will be permanently deducted from site stock.
+    </div>
+
+    <!-- Pullout notice -->
+    <div id="pulloutNote" class="alert d-none mb-3" style="background:#f0fdf4;border:1px solid #86efac;">
+        <i class="bi bi-box-arrow-left me-2 text-success"></i>
+        <strong>Pullout:</strong> Returns unused/surplus materials from the project site back to the warehouse.
+        Use this when materials are leftover and can be reused on other projects.
+    </div>
+
     <div class="d-flex gap-2">
         {{ form.submit(class='btn btn-primary px-4') }}
         <a href="{{ url_for('main.movement_list') }}" class="btn btn-outline-secondary px-4">Cancel</a>
@@ -126,24 +157,41 @@ document.getElementById('itemSel').addEventListener('change', function() {
     }).catch(()=>{});
 });
 
-// Pre-set from/to based on movement type
+// Pre-set from/to based on movement type + show contextual notes
 const typePresets = {
-    delivery: { from: 'external', to: 'warehouse' },
-    transfer: { from: 'warehouse', to: 'site' },
-    pullout:  { from: 'site',     to: 'warehouse' },
-    return:   { from: 'warehouse', to: 'external' },
-    consumption: { from: 'site', to: 'none' },
-    scrap:    { from: 'warehouse', to: 'none' },
-    adjustment: { from: 'none', to: 'none' },
+    delivery:    { from: 'external', to: 'warehouse',
+                   desc: 'Incoming stock from vendor delivered to warehouse.' },
+    transfer:    { from: 'warehouse', to: 'site',
+                   desc: 'Move materials from warehouse to project site.' },
+    pullout:     { from: 'site', to: 'warehouse',
+                   desc: 'Return unused/surplus materials from site back to warehouse.' },
+    return:      { from: 'warehouse', to: 'external',
+                   desc: 'Return defective or excess stock to the vendor.' },
+    consumption: { from: 'site', to: 'none',
+                   desc: 'Materials fully used up at site — cannot be pulled out.' },
+    scrap:       { from: 'warehouse', to: 'none',
+                   desc: 'Write off damaged or expired materials.' },
+    adjustment:  { from: 'none', to: 'none',
+                   desc: 'Inventory correction (audit variance, loss, etc.).' },
 };
-document.getElementById('mtype').addEventListener('change', function() {
-    const p = typePresets[this.value];
-    if (p) {
-        document.getElementById('fromType').value = p.from;
-        document.getElementById('toType').value = p.to;
-        toggleLocFields('fromType','fromWH','fromST');
-        toggleLocFields('toType','toWH','toST');
-    }
-});
+
+const mtypeDescEl = document.getElementById('mtypeDesc');
+const consumptionNote = document.getElementById('consumptionNote');
+const pulloutNote = document.getElementById('pulloutNote');
+
+function applyPreset(val) {
+    const p = typePresets[val];
+    if (!p) return;
+    document.getElementById('fromType').value = p.from;
+    document.getElementById('toType').value = p.to;
+    toggleLocFields('fromType','fromWH','fromST');
+    toggleLocFields('toType','toWH','toST');
+    mtypeDescEl.textContent = p.desc;
+    consumptionNote.classList.toggle('d-none', val !== 'consumption');
+    pulloutNote.classList.toggle('d-none', val !== 'pullout');
+}
+
+document.getElementById('mtype').addEventListener('change', function() { applyPreset(this.value); });
+applyPreset(document.getElementById('mtype').value);
 </script>
 {% endblock %}

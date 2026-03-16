@@ -13,10 +13,13 @@ A comprehensive movement-based inventory management system for companies managin
 ## Key Features
 - **Dashboard** with live charts (7-day movement trends), low-stock alerts, recent activity
 - **Inventory Catalog** — Items with SKU, category, unit cost, photo, reorder threshold
-- **7 Movement Types** — Delivery, Transfer, Pullout, Adjustment, Return, Consumption, Scrap
+- **Two Item Types with separate workflows:**
+  - **Consumables / Materials** (cement, rebar, fuel, etc.) — tracked by quantity. Movements: Delivery, Transfer (WH→Site), Pullout (Site→WH if surplus), Consumption (used up at site, cannot be pulled out), Adjustment, Return, Scrap
+  - **Tools / Equipment / Non-Consumables (Assets)** — tracked individually by asset tag. Each physical unit is Transferred to site, Pulled out back to warehouse, or moved to another site. NEVER consumed.
+- **Asset Unit Management** — Individual unit lifecycle (Available → Deployed → Maintenance → Scrapped), bulk register, move/pullout per unit
 - **Stock Ledger** — All quantities calculated from transaction history (immutable audit trail)
 - **Warehouses** — Multiple storage facilities with stock tracking and value calculation
-- **Project Sites** — Client sites with budget, status, inventory, and requisition tracking
+- **Project Sites** — Split view: Tools/Equipment (deployed units) vs Materials (consumable stock); both with pullout actions
 - **Material Requisitions** — Full workflow: submit → approve/reject → fulfill (auto-transfers stock)
 - **Reports** — Stock levels matrix, movement log with filters, low stock alerts
 - **User Management** — 7 roles with permission-based access control (admin only)

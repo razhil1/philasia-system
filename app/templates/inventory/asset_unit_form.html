@@ -1,0 +1,91 @@
+{% extends 'layouts/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}Asset Unit{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div>
+        <h1>{{ title }}</h1>
+        <p>{{ item.name }} <code>{{ item.sku }}</code></p>
+    </div>
+    <a href="{{ url_for('main.asset_unit_list', item_id=item.id) }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Units
+    </a>
+</div>
+
+<div class="alert alert-primary d-flex align-items-start gap-2 mb-4" style="background:#eff6ff;border-color:#bfdbfe;">
+    <i class="bi bi-info-circle-fill text-primary mt-1 flex-shrink-0"></i>
+    <div>
+        Each unit of this <strong>Tool / Equipment / Non-Consumable</strong> is tracked individually by asset tag.
+        Set the initial location when registering. Use the <em>Move / Pullout</em> function to change its location later.
+    </div>
+</div>
+
+<div class="row justify-content-center">
+<div class="col-lg-7">
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="card mb-3">
+        <div class="card-header">Unit Identity</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.asset_tag.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.asset_tag(class='form-control', placeholder=suggested_tag) }}
+                    <div class="form-text">Suggested: <code>{{ suggested_tag }}</code></div>
+                    {% for e in form.asset_tag.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.serial_number.label.text }}</label>
+                    {{ form.serial_number(class='form-control', placeholder='Optional manufacturer serial') }}
+                    {% for e in form.serial_number.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.status.label.text }}</label>
+                    {{ form.status(class='form-select') }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.condition.label.text }}</label>
+                    {{ form.condition(class='form-select') }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.acquired_date.label.text }}</label>
+                    {{ form.acquired_date(class='form-control') }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Current Location</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.location_type.label.text }}</label>
+                    {{ form.location_type(class='form-select', id='locType') }}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.location_id.label.text }}</label>
+                    {{ form.location_id(class='form-select') }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Notes</div>
+        <div class="card-body">
+            {{ form.notes(class='form-control', rows=3, placeholder='Any remarks about this unit…') }}
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        {{ form.submit(class='btn btn-primary px-4') }}
+        {% if not unit %}
+        <button type="submit" name="add_another" value="1" class="btn btn-outline-primary px-4">Save & Add Another</button>
+        {% endif %}
+        <a href="{{ url_for('main.asset_unit_list', item_id=item.id) }}" class="btn btn-outline-secondary px-4">Cancel</a>
+    </div>
+</form>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,228 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Move / Pullout — {{ item.name }}{% endblock %}
+{% block page_title %}Asset Movement{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div>
+        <h1>Move / Pullout: {{ item.name }}</h1>
+        <p><code>{{ item.sku }}</code> — Select units and choose their destination</p>
+    </div>
+    <a href="{{ url_for('main.asset_unit_list', item_id=item.id) }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Units
+    </a>
+</div>
+
+<div class="alert alert-primary d-flex align-items-start gap-2 mb-4" style="background:#eff6ff;border-color:#bfdbfe;">
+    <i class="bi bi-tools text-primary mt-1 flex-shrink-0"></i>
+    <div>
+        <strong>Tools, Equipment & Non-Consumables</strong> must always be <strong>pulled out</strong> or
+        <strong>transferred</strong> — they are never consumed.
+        When a project ends or the item is no longer needed at a site, pull it back to the warehouse or move it to another site.
+    </div>
+</div>
+
+<!-- Filter by source -->
+<div class="card mb-4">
+    <div class="card-header">Filter by Source Location</div>
+    <div class="card-body">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Location Type</label>
+                <select name="src_type" class="form-select" id="srcTypeFilter">
+                    <option value="warehouse" {{ 'selected' if src_type == 'warehouse' }}>Warehouse</option>
+                    <option value="site" {{ 'selected' if src_type == 'site' }}>Project Site</option>
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Location</label>
+                <select name="src_id" class="form-select">
+                    <option value="0">— All locations —</option>
+                    {% for wh in warehouses %}
+                    <option value="{{ wh.id }}" data-type="warehouse" {{ 'selected' if src_type == 'warehouse' and src_id == wh.id }}>{{ wh.name }}</option>
+                    {% endfor %}
+                    {% for s in sites %}
+                    <option value="{{ s.id }}" data-type="site" {{ 'selected' if src_type == 'site' and src_id == s.id }}>{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-outline-primary w-100">Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form method="POST" id="moveForm">
+    {{ form.hidden_tag() }}
+
+    <div class="row g-4">
+        <!-- Unit selection -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Select Units to Move ({{ units|length }} available)</span>
+                    <label class="d-flex align-items-center gap-2 mb-0 small text-muted" style="cursor:pointer;">
+                        <input type="checkbox" id="selAll" class="form-check-input"> Select All
+                    </label>
+                </div>
+                <div class="table-responsive" style="max-height:420px;overflow-y:auto;">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;"></th>
+                            <th>Asset Tag</th>
+                            <th>Serial #</th>
+                            <th>Status</th>
+                            <th>Condition</th>
+                            <th>Location</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for unit in units %}
+                    <tr class="{{ 'table-primary' if unit.status == 'deployed' else '' }}">
+                        <td><input type="checkbox" name="unit_ids" value="{{ unit.id }}" class="form-check-input unit-cb"></td>
+                        <td><code>{{ unit.asset_tag }}</code></td>
+                        <td class="text-muted small">{{ unit.serial_number or '—' }}</td>
+                        <td><span class="badge bg-{{ unit.status_color }}">{{ unit.status_label }}</span></td>
+                        <td>
+                            <span class="badge" style="background:{{ 'rgba(16,185,129,.12)' if unit.condition == 'good' else 'rgba(245,158,11,.15)' if unit.condition == 'fair' else 'rgba(239,68,68,.12)' }};
+                                 color:{{ '#065f46' if unit.condition == 'good' else '#92400e' if unit.condition == 'fair' else '#b91c1c' }}">
+                                {{ unit.condition_label }}
+                            </span>
+                        </td>
+                        <td class="small text-muted">{{ unit.location_name() }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center text-muted py-4">No units available at the selected source.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                <div class="card-footer text-muted small">
+                    <span id="selCountLabel">0</span> unit(s) selected
+                </div>
+            </div>
+        </div>
+
+        <!-- Movement details -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">Movement Details</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.movement_type.label.text }} <span class="text-danger">*</span></label>
+                        {{ form.movement_type(class='form-select', id='mtype') }}
+                        <div class="form-text mt-1" id="mtypeHelp"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Destination Type</label>
+                        {{ form.to_location_type(class='form-select', id='toType') }}
+                    </div>
+                    <div id="toWH" class="mb-3 d-none">
+                        <label class="form-label">Destination Warehouse</label>
+                        {{ form.to_warehouse_id(class='form-select') }}
+                    </div>
+                    <div id="toST" class="mb-3 d-none">
+                        <label class="form-label">Destination Site</label>
+                        {{ form.to_site_id(class='form-select') }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">New Condition</label>
+                        {{ form.condition(class='form-select') }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.reference.label.text }}</label>
+                        {{ form.reference(class='form-control', placeholder='DR / PO / RR number') }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes / Remarks</label>
+                        {{ form.notes(class='form-control', rows=2) }}
+                    </div>
+                </div>
+                <div class="card-footer">
+                    {{ form.submit(class='btn btn-primary w-100', id='submitBtn') }}
+                    <div class="text-danger small mt-2 d-none" id="noSelWarn">Please select at least one unit to move.</div>
+                </div>
+            </div>
+
+            <!-- Quick guide -->
+            <div class="card mt-3" style="border-color:#bfdbfe;background:#eff6ff;">
+                <div class="card-body p-3">
+                    <div class="fw-semibold small mb-2 text-primary"><i class="bi bi-lightbulb me-1"></i>Movement Guide</div>
+                    <div class="small text-muted">
+                        <div class="mb-1"><span class="badge move-transfer me-1">Transfer</span> Warehouse → Project Site (Deploy)</div>
+                        <div class="mb-1"><span class="badge move-pullout me-1">Pullout</span> Site → Warehouse (Return after project)</div>
+                        <div class="mb-1"><span class="badge text-bg-secondary me-1">Site Transfer</span> Site → Another Site</div>
+                        <div class="mb-1"><span class="badge move-adjustment me-1">Maintenance</span> Send for repair</div>
+                        <div><span class="badge move-scrap me-1">Scrap</span> Dispose permanently</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <a href="{{ url_for('main.asset_unit_list', item_id=item.id) }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+const mtypeDescriptions = {
+    transfer: 'Deploy units to a project site.',
+    pullout: 'Return units from site back to warehouse.',
+    delivery: 'Record newly received units.',
+    maintenance: 'Send units for repair/maintenance.',
+    scrap: 'Permanently dispose of units.',
+    adjustment: 'Administrative correction.',
+};
+
+const toPresets = {
+    transfer: 'site',
+    pullout: 'warehouse',
+    delivery: 'warehouse',
+    maintenance: 'none',
+    scrap: 'none',
+    adjustment: 'none',
+};
+
+const mtypeEl = document.getElementById('mtype');
+const toTypeEl = document.getElementById('toType');
+const mtypeHelp = document.getElementById('mtypeHelp');
+
+function toggleDest() {
+    const val = toTypeEl.value;
+    document.getElementById('toWH').classList.toggle('d-none', val !== 'warehouse');
+    document.getElementById('toST').classList.toggle('d-none', val !== 'site');
+}
+
+mtypeEl.addEventListener('change', function() {
+    const p = toPresets[this.value];
+    if (p) { toTypeEl.value = p; toggleDest(); }
+    mtypeHelp.textContent = mtypeDescriptions[this.value] || '';
+});
+toTypeEl.addEventListener('change', toggleDest);
+toggleDest();
+mtypeHelp.textContent = mtypeDescriptions[mtypeEl.value] || '';
+
+// Select all
+const selAll = document.getElementById('selAll');
+const cbs = document.querySelectorAll('.unit-cb');
+const selCountLabel = document.getElementById('selCountLabel');
+function updateCount() {
+    const n = [...cbs].filter(c => c.checked).length;
+    selCountLabel.textContent = n;
+}
+selAll.addEventListener('change', () => { cbs.forEach(c => c.checked = selAll.checked); updateCount(); });
+cbs.forEach(c => c.addEventListener('change', updateCount));
+
+// Validate on submit
+document.getElementById('moveForm').addEventListener('submit', function(e) {
+    const sel = [...cbs].filter(c => c.checked).length;
+    if (sel === 0) {
+        e.preventDefault();
+        document.getElementById('noSelWarn').classList.remove('d-none');
+    }
+});
+</script>
+{% endblock %}

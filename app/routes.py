@@ -218,11 +218,15 @@ def asset_unit_list(item_id):
         flash('This item is a consumable — it does not have individual unit tracking.', 'info')
         return redirect(url_for('main.item_detail', item_id=item_id))
     units = AssetUnit.query.filter_by(item_id=item_id).order_by(AssetUnit.status, AssetUnit.asset_tag).all()
-    warehouses = {w.id: w.name for w in Warehouse.query.all()}
-    sites = {s.id: s.name for s in ProjectSite.query.all()}
+    warehouse_list = Warehouse.query.filter_by(is_active=True).order_by('name').all()
+    site_list = ProjectSite.query.order_by('name').all()
+    warehouses = {w.id: w.name for w in warehouse_list}
+    sites = {s.id: s.name for s in site_list}
     counts = item.asset_count_by_status()
     return render_template('inventory/asset_units.html', item=item, units=units,
-                           warehouses=warehouses, sites=sites, counts=counts,
+                           warehouses=warehouses, sites=sites,
+                           warehouse_list=warehouse_list, site_list=site_list,
+                           counts=counts,
                            ASSET_STATUSES=ASSET_STATUSES, ASSET_CONDITIONS=ASSET_CONDITIONS)
 
 
@@ -755,13 +759,27 @@ def site_list():
 @login_required
 def site_detail(site_id):
     site = ProjectSite.query.get_or_404(site_id)
-    stocks = Stock.query.filter_by(site_id=site_id, location_type='site').all()
+    # Consumable stock at this site
+    stocks = Stock.query.filter_by(site_id=site_id, location_type='site').filter(
+        Stock.quantity > 0).all()
+    # Filter to only consumable items
+    consumable_stocks = [s for s in stocks if s.item.is_consumable]
+    # Deployed asset units at this site
+    deployed_assets = AssetUnit.query.filter_by(
+        location_type='site', location_id=site_id
+    ).filter(AssetUnit.status != 'scrapped').order_by(
+        AssetUnit.item_id, AssetUnit.asset_tag).all()
     requests = Request.query.filter_by(site_id=site_id).order_by(desc(Request.created_at)).limit(10).all()
     movements = Movement.query.filter(
         (Movement.from_site_id == site_id) | (Movement.to_site_id == site_id)
     ).order_by(desc(Movement.date)).limit(15).all()
-    return render_template('inventory/site_detail.html', site=site, stocks=stocks,
-                           requests=requests, movements=movements)
+    warehouses = Warehouse.query.filter_by(is_active=True).order_by(Warehouse.name).all()
+    sites = ProjectSite.query.filter(ProjectSite.id != site_id).order_by(ProjectSite.name).all()
+    return render_template('inventory/site_detail.html', site=site,
+                           consumable_stocks=consumable_stocks,
+                           deployed_assets=deployed_assets,
+                           requests=requests, movements=movements,
+                           warehouses=warehouses, other_sites=sites)
 
 
 @main.route('/sites/new', methods=['GET', 'POST'])
@@ -827,6 +845,21 @@ def movement_list():
 def movement_create():
     form = MovementForm()
     if form.validate_on_submit():
+        item = Item.query.get(form.item_id.data)
+        if not item:
+            flash('Item not found.', 'danger')
+            return render_template('inventory/movement_form.html', form=form, title='New Material / Consumable Transaction')
+
+        # Enforce: assets/tools/equipment must use the Asset Unit management page
+        if item.is_asset:
+            flash(
+                f'"{item.name}" is a Tool / Equipment / Non-Consumable. '
+                'Please use the Asset Unit Management page to transfer or pull out this item.',
+                'warning'
+            )
+            return redirect(url_for('main.asset_unit_list', item_id=item.id))
+
+        # Enforce: consumption is only valid for consumables (double guard)
         qty = float(form.quantity.data)
         mtype = form.movement_type.data
         from_type = form.from_location_type.data
@@ -844,9 +877,9 @@ def movement_create():
             else:
                 q = q.filter_by(site_id=from_st)
             src_stock = q.first()
-            if src_stock and float(src_stock.quantity) < qty:
+            if not src_stock or float(src_stock.quantity) < qty:
                 flash('Insufficient stock at the source location.', 'danger')
-                return render_template('inventory/movement_form.html', form=form, title='New Transaction')
+                return render_template('inventory/movement_form.html', form=form, title='New Material / Consumable Transaction')
 
         movement = Movement(
             movement_type=mtype,
@@ -865,7 +898,7 @@ def movement_create():
         )
         db.session.add(movement)
 
-        # Update stock
+        # Update stock ledger
         _update_stock(form.item_id.data, from_type,
                       from_wh if from_type == 'warehouse' else None,
                       from_st if from_type == 'site' else None, -qty)
@@ -876,7 +909,7 @@ def movement_create():
         db.session.commit()
         flash('Transaction posted successfully.', 'success')
         return redirect(url_for('main.movement_list'))
-    return render_template('inventory/movement_form.html', form=form, title='New Transaction')
+    return render_template('inventory/movement_form.html', form=form, title='New Material / Consumable Transaction')
 
 
 @main.route('/movements/<int:mov_id>')

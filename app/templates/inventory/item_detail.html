@@ -5,12 +5,41 @@
 <div class="page-header d-flex justify-content-between align-items-end">
     <div>
         <h1>{{ item.name }}</h1>
-        <p><code>{{ item.sku }}</code> · {{ item.category.name if item.category else 'Uncategorized' }}</p>
+        <p>
+            <code>{{ item.sku }}</code> ·
+            {{ item.category.name if item.category else 'Uncategorized' }} ·
+            {% if item.is_asset %}
+            <span class="badge bg-primary bg-opacity-15 text-primary">Tool / Equipment / Non-Consumable</span>
+            {% else %}
+            <span class="badge bg-success bg-opacity-15 text-success">Material / Consumable</span>
+            {% endif %}
+        </p>
     </div>
     {% if current_user.can('manage_inventory') %}
     <a href="{{ url_for('main.item_edit', item_id=item.id) }}" class="btn btn-outline-primary"><i class="bi bi-pencil me-1"></i>Edit</a>
     {% endif %}
 </div>
+
+{% if item.is_asset %}
+<div class="alert d-flex align-items-start gap-3 mb-4" style="background:#eff6ff;border:1px solid #bfdbfe;">
+    <i class="bi bi-tools text-primary mt-1 flex-shrink-0"></i>
+    <div>
+        <strong>Tool / Equipment / Non-Consumable</strong> — This item is tracked by individual unit.
+        Each physical unit has its own asset tag, status, and movement history.
+        Use <strong>Asset Unit Management</strong> to transfer units to a site or pull them out.
+        These items are <em>never consumed</em> — they must always be returned or transferred when done.
+    </div>
+</div>
+{% else %}
+<div class="alert d-flex align-items-start gap-3 mb-4" style="background:#f0fdf4;border:1px solid #86efac;">
+    <i class="bi bi-box-seam text-success mt-1 flex-shrink-0"></i>
+    <div>
+        <strong>Material / Consumable</strong> — Tracked by quantity.
+        Stock can be <em>transferred</em> to a project site, <em>pulled out</em> (returned if surplus remains),
+        or marked as <em>consumed</em> when fully used up at the site.
+    </div>
+</div>
+{% endif %}
 
 <div class="row g-4">
     <div class="col-md-4">
@@ -19,7 +48,9 @@
                 {% if item.photo %}
                 <img src="/static/uploads/{{ item.photo }}" class="img-fluid rounded mb-3" style="max-height:180px;object-fit:contain;" alt="{{ item.name }}">
                 {% else %}
-                <div class="bg-light rounded d-flex align-items-center justify-content-center mb-3 mx-auto" style="width:120px;height:120px;"><i class="bi bi-box fs-1 text-muted"></i></div>
+                <div class="bg-light rounded d-flex align-items-center justify-content-center mb-3 mx-auto" style="width:120px;height:120px;">
+                    <i class="bi bi-{{ 'tools' if item.is_asset else 'box-seam' }} fs-1 text-muted"></i>
+                </div>
                 {% endif %}
                 <h5 class="fw-bold">{{ item.name }}</h5>
                 <p class="text-muted small">{{ item.description or 'No description.' }}</p>
@@ -35,10 +66,72 @@
                     </div>
                 </div>
             </div>
+            <div class="card-footer d-grid gap-2">
+                {% if item.is_asset %}
+                    <a href="{{ url_for('main.asset_unit_list', item_id=item.id) }}" class="btn btn-primary">
+                        <i class="bi bi-tags me-1"></i>Manage Asset Units
+                    </a>
+                    {% if current_user.can('manage_movements') %}
+                    <a href="{{ url_for('main.asset_unit_move', item_id=item.id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left-right me-1"></i>Move / Pullout Units
+                    </a>
+                    {% endif %}
+                {% else %}
+                    {% if current_user.can('manage_movements') %}
+                    <a href="{{ url_for('main.movement_create') }}" class="btn btn-primary">
+                        <i class="bi bi-arrow-left-right me-1"></i>Post Movement
+                    </a>
+                    <div class="row g-1 mt-1">
+                        <div class="col-6">
+                            <a href="{{ url_for('main.movement_create') }}?prefill=pullout" class="btn btn-outline-info btn-sm w-100">
+                                <i class="bi bi-box-arrow-left me-1"></i>Pullout
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('main.movement_create') }}?prefill=consumption" class="btn btn-outline-danger btn-sm w-100">
+                                <i class="bi bi-fire me-1"></i>Consumption
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endif %}
+            </div>
         </div>
     </div>
 
     <div class="col-md-8">
+        {% if item.is_asset %}
+        <!-- Asset: show units by status -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Unit Summary</span>
+                <a href="{{ url_for('main.asset_unit_list', item_id=item.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-tags me-1"></i>View All Units
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 text-center">
+                    <div class="col-3">
+                        <div class="fw-bold fs-4 text-success">{{ item.asset_count_by_status().get('available', 0) }}</div>
+                        <div class="small text-muted">Available</div>
+                    </div>
+                    <div class="col-3">
+                        <div class="fw-bold fs-4 text-primary">{{ item.asset_count_by_status().get('deployed', 0) }}</div>
+                        <div class="small text-muted">Deployed</div>
+                    </div>
+                    <div class="col-3">
+                        <div class="fw-bold fs-4 text-warning">{{ item.asset_count_by_status().get('maintenance', 0) }}</div>
+                        <div class="small text-muted">Maintenance</div>
+                    </div>
+                    <div class="col-3">
+                        <div class="fw-bold fs-4 text-danger">{{ item.asset_count_by_status().get('scrapped', 0) }}</div>
+                        <div class="small text-muted">Scrapped</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Consumable: show stock by location -->
         <div class="card mb-4">
             <div class="card-header">Stock by Location</div>
             <div class="table-responsive">
@@ -48,8 +141,14 @@
                 {% for s in stocks %}
                 <tr>
                     <td class="fw-semibold">{{ s.location_name() }}</td>
-                    <td><span class="badge bg-{{ 'info' if s.location_type == 'site' else 'primary' }} bg-opacity-15 text-{{ 'info' if s.location_type == 'site' else 'primary' }}">{{ s.location_type.title() }}</span></td>
-                    <td class="{{ 'text-danger fw-bold' if s.quantity|float < item.reorder_level|float else '' }}">{{ s.quantity | round(2) }} {{ item.unit }}</td>
+                    <td>
+                        <span class="badge bg-{{ 'info' if s.location_type == 'site' else 'primary' }} bg-opacity-15 text-{{ 'info' if s.location_type == 'site' else 'primary' }}">
+                            {{ s.location_type.title() }}
+                        </span>
+                    </td>
+                    <td class="{{ 'text-danger fw-bold' if s.quantity|float < item.reorder_level|float else '' }}">
+                        {{ s.quantity | round(2) }} {{ item.unit }}
+                    </td>
                     <td class="text-muted">₱{{ '{:,.2f}'.format(s.quantity|float * item.unit_cost|float) }}</td>
                 </tr>
                 {% else %}
@@ -64,11 +163,22 @@
             </table>
             </div>
         </div>
+        {% endif %}
 
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>Recent Movements</span>
-                <a href="{{ url_for('main.movement_create') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Post Movement</a>
+                {% if item.is_asset %}
+                <a href="{{ url_for('main.asset_unit_move', item_id=item.id) }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-arrow-left-right me-1"></i>Move / Pullout
+                </a>
+                {% else %}
+                {% if current_user.can('manage_movements') %}
+                <a href="{{ url_for('main.movement_create') }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Post Movement
+                </a>
+                {% endif %}
+                {% endif %}
             </div>
             <div class="table-responsive">
             <table class="table table-sm mb-0">
