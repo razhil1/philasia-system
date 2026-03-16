@@ -3,11 +3,12 @@ from flask_login import login_required, current_user
 from functools import wraps
 from app import db
 from app.models import (Item, Warehouse, ProjectSite, Stock, Movement, Request,
-                         RequestItem, Category, User, MOVEMENT_TYPES)
+                         RequestItem, Category, User, AssetUnit, AssetUnitMovement,
+                         MOVEMENT_TYPES, ITEM_TYPES, ASSET_STATUSES, ASSET_CONDITIONS)
 from app.forms import (ItemForm, WarehouseForm, ProjectSiteForm, MovementForm,
                         RequestForm, RequestItemForm, UserForm, CategoryForm,
                         ApproveRequestForm, RejectRequestForm, ReportFilterForm,
-                        ChangePasswordForm)
+                        ChangePasswordForm, AssetUnitForm, AssetMovementForm)
 from sqlalchemy import func, desc
 from datetime import datetime, date, timedelta
 from werkzeug.utils import secure_filename
@@ -172,6 +173,7 @@ def item_create():
                     category_id=form.category_id.data, unit=form.unit.data,
                     unit_cost=form.unit_cost.data or 0,
                     reorder_level=form.reorder_level.data or 0,
+                    item_type=form.item_type.data,
                     photo=filename, is_active=form.is_active.data)
         db.session.add(item)
         db.session.commit()
@@ -198,11 +200,243 @@ def item_edit(item_id):
         item.unit = form.unit.data
         item.unit_cost = form.unit_cost.data or 0
         item.reorder_level = form.reorder_level.data or 0
+        item.item_type = form.item_type.data
         item.is_active = form.is_active.data
         db.session.commit()
         flash('Item updated.', 'success')
         return redirect(url_for('main.item_detail', item_id=item_id))
     return render_template('inventory/item_form.html', form=form, title='Edit Item', item=item)
+
+
+# ─── ASSET UNIT MANAGEMENT ────────────────────────────────────────────────────
+
+@main.route('/items/<int:item_id>/units')
+@login_required
+def asset_unit_list(item_id):
+    item = Item.query.get_or_404(item_id)
+    if not item.is_asset:
+        flash('This item is a consumable — it does not have individual unit tracking.', 'info')
+        return redirect(url_for('main.item_detail', item_id=item_id))
+    units = AssetUnit.query.filter_by(item_id=item_id).order_by(AssetUnit.status, AssetUnit.asset_tag).all()
+    warehouses = {w.id: w.name for w in Warehouse.query.all()}
+    sites = {s.id: s.name for s in ProjectSite.query.all()}
+    counts = item.asset_count_by_status()
+    return render_template('inventory/asset_units.html', item=item, units=units,
+                           warehouses=warehouses, sites=sites, counts=counts,
+                           ASSET_STATUSES=ASSET_STATUSES, ASSET_CONDITIONS=ASSET_CONDITIONS)
+
+
+@main.route('/items/<int:item_id>/units/new', methods=['GET', 'POST'])
+@login_required
+@permission_required('manage_inventory')
+def asset_unit_create(item_id):
+    item = Item.query.get_or_404(item_id)
+    if not item.is_asset:
+        abort(400)
+    form = AssetUnitForm()
+    if form.validate_on_submit():
+        # Determine location type from chosen location id
+        loc_type = form.location_type.data
+        loc_id = form.location_id.data
+        unit = AssetUnit(
+            item_id=item_id,
+            asset_tag=form.asset_tag.data.strip(),
+            serial_number=form.serial_number.data or None,
+            status=form.status.data,
+            condition=form.condition.data,
+            location_type=loc_type,
+            location_id=loc_id,
+            acquired_date=form.acquired_date.data,
+            notes=form.notes.data or None,
+        )
+        db.session.add(unit)
+        db.session.commit()
+        flash(f'Unit {unit.asset_tag} registered.', 'success')
+        if 'add_another' in request.form:
+            return redirect(url_for('main.asset_unit_create', item_id=item_id))
+        return redirect(url_for('main.asset_unit_list', item_id=item_id))
+    # Auto-suggest tag
+    last = AssetUnit.query.filter_by(item_id=item_id).order_by(desc(AssetUnit.id)).first()
+    if last:
+        parts = last.asset_tag.rsplit('-', 1)
+        try:
+            next_tag = f"{parts[0]}-{int(parts[1])+1:03d}"
+        except (ValueError, IndexError):
+            next_tag = f"{item.sku}-001"
+    else:
+        next_tag = f"{item.sku}-001"
+    return render_template('inventory/asset_unit_form.html', form=form, item=item,
+                           title='Register Asset Unit', suggested_tag=next_tag)
+
+
+@main.route('/asset-units/<int:unit_id>/edit', methods=['GET', 'POST'])
+@login_required
+@permission_required('manage_inventory')
+def asset_unit_edit(unit_id):
+    unit = AssetUnit.query.get_or_404(unit_id)
+    item = unit.item
+    form = AssetUnitForm(obj=unit)
+    if form.validate_on_submit():
+        unit.asset_tag = form.asset_tag.data.strip()
+        unit.serial_number = form.serial_number.data or None
+        unit.status = form.status.data
+        unit.condition = form.condition.data
+        unit.location_type = form.location_type.data
+        unit.location_id = form.location_id.data
+        unit.acquired_date = form.acquired_date.data
+        unit.notes = form.notes.data or None
+        db.session.commit()
+        flash(f'Unit {unit.asset_tag} updated.', 'success')
+        return redirect(url_for('main.asset_unit_list', item_id=item.id))
+    return render_template('inventory/asset_unit_form.html', form=form, item=item,
+                           unit=unit, title=f'Edit Unit — {unit.asset_tag}', suggested_tag=unit.asset_tag)
+
+
+@main.route('/items/<int:item_id>/units/bulk-register', methods=['POST'])
+@login_required
+@permission_required('manage_inventory')
+def asset_unit_bulk_register(item_id):
+    """Quick-register multiple units with auto-incrementing tags."""
+    item = Item.query.get_or_404(item_id)
+    if not item.is_asset:
+        abort(400)
+    prefix = request.form.get('prefix', item.sku).strip()
+    start_num = int(request.form.get('start_num', 1))
+    count = min(int(request.form.get('count', 1)), 100)
+    loc_type = request.form.get('location_type', 'warehouse')
+    loc_id = int(request.form.get('location_id', 0))
+    condition = request.form.get('condition', 'good')
+
+    if not loc_id:
+        flash('Please select a location.', 'danger')
+        return redirect(url_for('main.asset_unit_list', item_id=item_id))
+
+    created = 0
+    for i in range(count):
+        tag = f"{prefix}-{start_num + i:03d}"
+        if not AssetUnit.query.filter_by(asset_tag=tag).first():
+            db.session.add(AssetUnit(
+                item_id=item_id, asset_tag=tag, status='available',
+                condition=condition, location_type=loc_type, location_id=loc_id,
+            ))
+            created += 1
+    db.session.commit()
+    flash(f'{created} units registered successfully.', 'success')
+    return redirect(url_for('main.asset_unit_list', item_id=item_id))
+
+
+@main.route('/items/<int:item_id>/units/move', methods=['GET', 'POST'])
+@login_required
+@permission_required('manage_movements')
+def asset_unit_move(item_id):
+    """Move selected asset units to a new location."""
+    item = Item.query.get_or_404(item_id)
+    if not item.is_asset:
+        abort(400)
+
+    # Filter units by source location (from query params on GET)
+    src_type = request.args.get('src_type', 'warehouse')
+    src_id = int(request.args.get('src_id', 0))
+
+    form = AssetMovementForm()
+
+    if form.validate_on_submit():
+        unit_ids = request.form.getlist('unit_ids')
+        if not unit_ids:
+            flash('Please select at least one unit to move.', 'danger')
+            return redirect(url_for('main.asset_unit_move', item_id=item_id))
+
+        mtype = form.movement_type.data
+        to_loc_type = form.to_location_type.data
+        to_loc_id = form.to_warehouse_id.data if to_loc_type == 'warehouse' else form.to_site_id.data
+
+        # Determine new status
+        status_map = {
+            'transfer': 'deployed',
+            'pullout': 'available',
+            'delivery': 'available',
+            'maintenance': 'maintenance',
+            'scrap': 'scrapped',
+            'adjustment': None,  # keep current
+        }
+        new_status = status_map.get(mtype)
+
+        # Create one Movement record for the batch
+        from_wh_id = src_id if src_type == 'warehouse' else None
+        from_site_id = src_id if src_type == 'site' else None
+        to_wh_id = to_loc_id if to_loc_type == 'warehouse' else None
+        to_site_id_val = to_loc_id if to_loc_type == 'site' else None
+
+        movement = Movement(
+            movement_type=mtype,
+            item_id=item_id,
+            quantity=len(unit_ids),
+            unit_cost=item.unit_cost,
+            from_location_type=src_type if src_id else 'external',
+            from_warehouse_id=from_wh_id,
+            from_site_id=from_site_id,
+            to_location_type=to_loc_type if to_loc_type != 'none' else 'external',
+            to_warehouse_id=to_wh_id,
+            to_site_id=to_site_id_val,
+            reference=form.reference.data or None,
+            notes=form.notes.data or None,
+            user_id=current_user.id,
+        )
+        db.session.add(movement)
+        db.session.flush()
+
+        moved = 0
+        for uid in unit_ids:
+            unit = AssetUnit.query.get(int(uid))
+            if unit and unit.item_id == item_id:
+                if new_status:
+                    unit.status = new_status
+                unit.condition = form.condition.data or unit.condition
+                if to_loc_type != 'none' and to_loc_id:
+                    unit.location_type = to_loc_type
+                    unit.location_id = to_loc_id
+                db.session.add(AssetUnitMovement(asset_unit_id=unit.id, movement_id=movement.id))
+                moved += 1
+
+        movement.quantity = moved
+        db.session.commit()
+        flash(f'{moved} unit(s) moved successfully.', 'success')
+        return redirect(url_for('main.asset_unit_list', item_id=item_id))
+
+    # Get available units at source for display
+    if src_id:
+        units = AssetUnit.query.filter_by(item_id=item_id, location_type=src_type,
+                                          location_id=src_id).filter(
+            AssetUnit.status != 'scrapped').order_by(AssetUnit.asset_tag).all()
+    else:
+        units = AssetUnit.query.filter_by(item_id=item_id).filter(
+            AssetUnit.status != 'scrapped').order_by(AssetUnit.asset_tag).all()
+
+    warehouses = Warehouse.query.filter_by(is_active=True).order_by('name').all()
+    sites = ProjectSite.query.order_by('name').all()
+    return render_template('inventory/asset_move.html', item=item, form=form, units=units,
+                           warehouses=warehouses, sites=sites,
+                           src_type=src_type, src_id=src_id,
+                           ASSET_STATUSES=ASSET_STATUSES)
+
+
+@main.route('/asset-units/api/by-item/<int:item_id>')
+@login_required
+def api_asset_units(item_id):
+    """JSON API: return units for a given item, optionally filtered by location."""
+    loc_type = request.args.get('loc_type')
+    loc_id = request.args.get('loc_id', type=int)
+    q = AssetUnit.query.filter_by(item_id=item_id).filter(AssetUnit.status != 'scrapped')
+    if loc_type:
+        q = q.filter_by(location_type=loc_type)
+    if loc_id:
+        q = q.filter_by(location_id=loc_id)
+    return jsonify([{
+        'id': u.id, 'tag': u.asset_tag, 'serial': u.serial_number or '',
+        'status': u.status, 'status_label': u.status_label, 'status_color': u.status_color,
+        'condition': u.condition, 'condition_label': u.condition_label,
+        'location_name': u.location_name(),
+    } for q_u in [q.order_by(AssetUnit.asset_tag).all()] for u in q_u])
 
 
 # ─── ITEMS BULK IMPORT ────────────────────────────────────────────────────────

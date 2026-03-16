@@ -3,7 +3,7 @@ from flask_wtf.file import FileField, FileAllowed
 from wtforms import (StringField, TextAreaField, DecimalField, SelectField,
                      DateField, SubmitField, BooleanField, PasswordField)
 from wtforms.validators import DataRequired, Optional, NumberRange, Email, Length, EqualTo
-from app.models import ROLES, MOVEMENT_TYPES
+from app.models import ROLES, MOVEMENT_TYPES, ITEM_TYPES, ASSET_STATUSES, ASSET_CONDITIONS
 
 
 class UserForm(FlaskForm):
@@ -33,6 +33,10 @@ class CategoryForm(FlaskForm):
 class ItemForm(FlaskForm):
     sku = StringField('SKU / Item Code', validators=[DataRequired(), Length(max=50)])
     name = StringField('Item Name', validators=[DataRequired(), Length(max=200)])
+    item_type = SelectField('Item Type', choices=[
+        ('consumable', 'Consumable / Material — tracked by quantity'),
+        ('asset', 'Asset / Equipment / Tool — tracked individually'),
+    ], default='consumable', validators=[DataRequired()])
     description = TextAreaField('Description', validators=[Optional()])
     category_id = SelectField('Category', coerce=int, validators=[DataRequired()])
     unit = StringField('Unit (e.g., pcs, kg, bag)', validators=[DataRequired(), Length(max=30)])
@@ -46,6 +50,62 @@ class ItemForm(FlaskForm):
         super().__init__(*args, **kwargs)
         from app.models import Category
         self.category_id.choices = [(c.id, c.name) for c in Category.query.order_by('name').all()]
+
+
+class AssetUnitForm(FlaskForm):
+    asset_tag = StringField('Asset Tag / Code', validators=[DataRequired(), Length(max=50)],
+                            description='Unique identifier, e.g. GEN-001-001')
+    serial_number = StringField('Serial Number', validators=[Optional(), Length(max=100)])
+    status = SelectField('Status', choices=[(k, v[0]) for k, v in ASSET_STATUSES.items()],
+                         default='available', validators=[DataRequired()])
+    condition = SelectField('Condition', choices=[(k, v[0]) for k, v in ASSET_CONDITIONS.items()],
+                            default='good', validators=[DataRequired()])
+    location_type = SelectField('Current Location Type', choices=[
+        ('warehouse', 'Warehouse'),
+        ('site', 'Project Site'),
+    ], default='warehouse', validators=[DataRequired()])
+    location_id = SelectField('Location', coerce=int, validators=[DataRequired()])
+    acquired_date = DateField('Date Acquired', validators=[Optional()])
+    notes = TextAreaField('Notes / Remarks', validators=[Optional()])
+    submit = SubmitField('Save Unit')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from app.models import Warehouse, ProjectSite
+        wh = [(w.id, f'[WH] {w.name}') for w in Warehouse.query.filter_by(is_active=True).order_by('name').all()]
+        st = [(s.id, f'[SITE] {s.name}') for s in ProjectSite.query.order_by('name').all()]
+        self.location_id.choices = wh + st if wh or st else [(0, '— No locations —')]
+
+
+class AssetMovementForm(FlaskForm):
+    movement_type = SelectField('Movement Type', choices=[
+        ('transfer', 'Transfer to Site'),
+        ('pullout', 'Pullout — Return to Warehouse'),
+        ('delivery', 'New Delivery / Received'),
+        ('maintenance', 'Send to Maintenance'),
+        ('scrap', 'Scrap / Dispose'),
+        ('adjustment', 'Adjustment'),
+    ], validators=[DataRequired()])
+    to_location_type = SelectField('Destination Type', choices=[
+        ('warehouse', 'Warehouse'),
+        ('site', 'Project Site'),
+        ('none', 'N/A (Scrapped/Disposed)'),
+    ], default='warehouse', validators=[DataRequired()])
+    to_warehouse_id = SelectField('Destination Warehouse', coerce=int, validators=[Optional()])
+    to_site_id = SelectField('Destination Site', coerce=int, validators=[Optional()])
+    condition = SelectField('New Condition', choices=[(k, v[0]) for k, v in ASSET_CONDITIONS.items()],
+                            default='good', validators=[Optional()])
+    reference = StringField('Reference # (DR/PO/RR)', validators=[Optional(), Length(max=100)])
+    notes = TextAreaField('Remarks / Notes', validators=[Optional()])
+    submit = SubmitField('Move Units')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from app.models import Warehouse, ProjectSite
+        wh = [(0, '— Select —')] + [(w.id, w.name) for w in Warehouse.query.filter_by(is_active=True).order_by('name').all()]
+        st = [(0, '— Select —')] + [(s.id, s.name) for s in ProjectSite.query.order_by('name').all()]
+        self.to_warehouse_id.choices = wh
+        self.to_site_id.choices = st
 
 
 class WarehouseForm(FlaskForm):

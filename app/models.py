@@ -104,6 +104,25 @@ class Category(db.Model):
         return f'<Category {self.name}>'
 
 
+ITEM_TYPES = {
+    'consumable': 'Consumable / Material',
+    'asset': 'Asset / Equipment / Tool',
+}
+
+ASSET_STATUSES = {
+    'available': ('Available', 'success'),
+    'deployed': ('Deployed at Site', 'primary'),
+    'maintenance': ('Under Maintenance', 'warning'),
+    'scrapped': ('Scrapped / Disposed', 'danger'),
+}
+
+ASSET_CONDITIONS = {
+    'good': ('Good', 'success'),
+    'fair': ('Fair', 'warning'),
+    'poor': ('Poor', 'danger'),
+}
+
+
 class Item(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sku = db.Column(db.String(50), unique=True, index=True, nullable=False)
@@ -113,31 +132,115 @@ class Item(db.Model):
     unit = db.Column(db.String(30), nullable=False)
     unit_cost = db.Column(db.Numeric(12, 2), default=0)
     reorder_level = db.Column(db.Numeric(10, 2), default=0)
+    item_type = db.Column(db.String(20), default='consumable', nullable=False)
     photo = db.Column(db.String(255))
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     stocks = db.relationship('Stock', backref='item', lazy='dynamic')
     movements = db.relationship('Movement', backref='item', foreign_keys='Movement.item_id')
+    asset_units = db.relationship('AssetUnit', backref='item', lazy='dynamic',
+                                  cascade='all, delete-orphan')
+
+    @property
+    def is_asset(self):
+        return self.item_type == 'asset'
+
+    @property
+    def is_consumable(self):
+        return self.item_type == 'consumable'
+
+    @property
+    def type_label(self):
+        return ITEM_TYPES.get(self.item_type, self.item_type.title())
 
     def total_stock(self):
         from sqlalchemy import func
         from app import db as _db
+        if self.is_asset:
+            return float(AssetUnit.query.filter_by(item_id=self.id).filter(
+                AssetUnit.status != 'scrapped').count())
         result = _db.session.query(func.sum(Stock.quantity)).filter_by(item_id=self.id).scalar()
         return float(result or 0)
 
     def warehouse_stock(self):
         from sqlalchemy import func
         from app import db as _db
+        if self.is_asset:
+            return float(AssetUnit.query.filter_by(
+                item_id=self.id, location_type='warehouse', status='available').count())
         result = _db.session.query(func.sum(Stock.quantity)).filter_by(
             item_id=self.id, location_type='warehouse').scalar()
         return float(result or 0)
 
+    def asset_count_by_status(self):
+        counts = {}
+        for status in ASSET_STATUSES:
+            counts[status] = AssetUnit.query.filter_by(item_id=self.id, status=status).count()
+        return counts
+
     def is_low_stock(self):
+        if self.is_asset:
+            return self.warehouse_stock() < float(self.reorder_level or 0)
         return self.total_stock() < float(self.reorder_level or 0)
 
     def __repr__(self):
         return f'<Item {self.sku}: {self.name}>'
+
+
+class AssetUnit(db.Model):
+    __tablename__ = 'asset_unit'
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    asset_tag = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    serial_number = db.Column(db.String(100))
+    status = db.Column(db.String(20), default='available', nullable=False)
+    condition = db.Column(db.String(20), default='good', nullable=False)
+    location_type = db.Column(db.String(20), default='warehouse')  # warehouse / site
+    location_id = db.Column(db.Integer)
+    acquired_date = db.Column(db.Date)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    movements = db.relationship('AssetUnitMovement', backref='unit', lazy='dynamic',
+                                cascade='all, delete-orphan')
+
+    @property
+    def status_label(self):
+        return ASSET_STATUSES.get(self.status, (self.status.title(), 'secondary'))[0]
+
+    @property
+    def status_color(self):
+        return ASSET_STATUSES.get(self.status, (self.status.title(), 'secondary'))[1]
+
+    @property
+    def condition_label(self):
+        return ASSET_CONDITIONS.get(self.condition, (self.condition.title(), 'secondary'))[0]
+
+    @property
+    def condition_color(self):
+        return ASSET_CONDITIONS.get(self.condition, (self.condition.title(), 'secondary'))[1]
+
+    def location_name(self):
+        if self.location_type == 'warehouse':
+            from app.models import Warehouse as _WH
+            w = _WH.query.get(self.location_id)
+            return w.name if w else 'Unknown Warehouse'
+        elif self.location_type == 'site':
+            s = ProjectSite.query.get(self.location_id)
+            return s.name if s else 'Unknown Site'
+        return 'Unassigned'
+
+    def __repr__(self):
+        return f'<AssetUnit {self.asset_tag}>'
+
+
+class AssetUnitMovement(db.Model):
+    __tablename__ = 'asset_unit_movement'
+    id = db.Column(db.Integer, primary_key=True)
+    asset_unit_id = db.Column(db.Integer, db.ForeignKey('asset_unit.id'), nullable=False)
+    movement_id = db.Column(db.Integer, db.ForeignKey('movement.id'), nullable=False)
+    movement = db.relationship('Movement')
 
 
 class Warehouse(db.Model):
