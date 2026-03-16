@@ -1,0 +1,93 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Audit Trail | PhilAsia Pro{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Stock Ledger (Audit Trail)</h1>
+        <p class="text-muted mb-0">Immutable record of all resource movements and adjustments</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="qb-outline-btn d-flex align-items-center gap-2">
+            <i class="bi bi-filter"></i>
+            <span>Export Trail</span>
+        </button>
+    </div>
+</div>
+
+<div class="qb-card mb-4">
+    <div class="qb-card-header bg-light bg-opacity-50">
+        <div class="d-flex gap-3 w-100 align-items-center">
+            <div class="search-container flex-grow-1" style="width: auto;">
+                <i class="bi bi-search"></i>
+                <input type="text" class="search-input" placeholder="Search by batch ID, SKU, or user...">
+            </div>
+            <select class="form-select form-select-sm w-auto border-secondary-subtle">
+                <option selected>All Transactions</option>
+                <option>Deliveries</option>
+                <option>Transfers</option>
+                <option>Adjustments</option>
+            </select>
+            <div class="vr mx-2"></div>
+            <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-printer"></i></button>
+        </div>
+    </div>
+    <div class="p-0">
+        <div class="table-responsive">
+            <table class="table qb-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Ledger Date</th>
+                        <th>Transaction ID</th>
+                        <th>Resource Allocation</th>
+                        <th>Change Source / Target</th>
+                        <th class="text-center">Authorized By</th>
+                        <th class="text-end pe-4">Volume</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for movement in movements %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="fw-bold small">{{ movement.date.strftime('%d %b %Y') }}</div>
+                            <div class="extra-small text-muted">{{ movement.date.strftime('%H:%M:%S') }}</div>
+                        </td>
+                        <td><code class="extra-small text-primary fw-bold">#{{ 1000 + movement.id }}</code></td>
+                        <td>
+                            <div class="fw-semibold small text-dark">{{ movement.item.name }}</div>
+                            <div class="extra-small text-muted">SKU: {{ movement.item.sku }}</div>
+                        </td>
+                        <td>
+                            <div class="small">
+                                <span class="text-muted">From:</span> {{ movement.from_warehouse.name if movement.from_warehouse_id else (movement.from_site.name if movement.from_site_id else 'External/Vendor') }}
+                            </div>
+                            <div class="small">
+                                <span class="text-muted">To:</span> {{ movement.to_warehouse.name if movement.to_warehouse_id else (movement.to_site.name if movement.to_site_id else 'Adjustment') }}
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border extra-small px-3">{{ movement.user.username }}</span>
+                        </td>
+                        <td class="text-end pe-4">
+                            <div class="fw-bold {% if movement.movement_type == 'delivery' %}text-success{% else %}text-danger{% endif %}">
+                                {{ '+' if movement.movement_type == 'delivery' else '-' }}{{ movement.quantity|int }}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <div class="py-4">
+                                <i class="bi bi-journal-x fs-1 opacity-25 mb-3 d-block"></i>
+                                <h6>No transactions found for the selected period.</h6>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Requisition #REQ-{{ 5000 + request.id }} | PhilAsia Pro{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end mb-4">
+    <div>
+        <div class="extra-small fw-bold text-muted text-uppercase mb-1">Material Requisition ID</div>
+        <h1 class="h3 fw-bold mb-1">#REQ-{{ 5000 + request.id }}</h1>
+        <p class="text-muted mb-0">For Project: <span class="text-dark fw-bold">{{ request.site.name }}</span></p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="qb-outline-btn"><i class="bi bi-printer me-2"></i>Print PO</button>
+        <button class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" style="background-color: var(--qb-green); border: none;">Fulfill Request</button>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <!-- Items List -->
+        <div class="qb-card mb-4">
+            <div class="qb-card-header bg-light">
+                <h6 class="fw-bold mb-0">Requested Resources</h6>
+            </div>
+            <div class="p-0">
+                <div class="table-responsive">
+                    <table class="table qb-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Item Specification</th>
+                                <th class="text-center">Requested Volume</th>
+                                <th class="text-end pe-4">Stock Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in request.items %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold small">{{ item.item.name }}</div>
+                                    <div class="extra-small text-muted">SKU: {{ item.item.sku }}</div>
+                                </td>
+                                <td class="text-center fw-bold">{{ item.quantity|int }} {{ item.item.unit }}</td>
+                                <td class="text-end pe-4">
+                                    <span class="badge bg-light text-success border px-2 extra-small">In Stock</span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center py-5 text-muted small">No items added to this requisition yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Items Form -->
+        {% if request.status == 'pending' %}
+        <div class="qb-card p-4 bg-light bg-opacity-50">
+            <h6 class="fw-bold small text-uppercase mb-3">Add Resource to Requisition</h6>
+            <form method="POST" class="row g-3">
+                {{ form.hidden_tag() }}
+                <div class="col-md-7">
+                    {{ form.item_id(class="form-select") }}
+                </div>
+                <div class="col-md-3">
+                    {{ form.quantity(class="form-control", placeholder="Qty") }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.submit(class="btn btn-primary w-100 fw-bold") }}
+                </div>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Requisition Metadata -->
+        <div class="qb-card p-4 mb-4">
+            <label class="extra-small fw-bold text-muted text-uppercase mb-3 d-block">Request Status</label>
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="rounded-circle bg-warning p-2"></div>
+                <div>
+                    <div class="fw-bold">{{ request.status.capitalize() }}</div>
+                    <div class="extra-small text-muted">Initiated by {{ request.user.username }}</div>
+                </div>
+            </div>
+            
+            <label class="extra-small fw-bold text-muted text-uppercase mb-2 d-block">Timeline</label>
+            <div class="ps-2 border-start py-1 ms-1">
+                <div class="extra-small mb-3">
+                    <div class="fw-bold">Created</div>
+                    <div class="text-muted">{{ request.created_at.strftime('%b %d, %Y - %H:%M') }}</div>
+                </div>
+                {% if request.status != 'pending' %}
+                <div class="extra-small text-muted">
+                    <div class="fw-bold">Processed</div>
+                    <div>Awaiting fulfillment logic...</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="qb-card p-4">
+            <label class="extra-small fw-bold text-muted text-uppercase mb-2 d-block">Reason / Strategy</label>
+            <p class="small text-dark mb-0 italic" style="font-style: italic;">"{{ request.notes or 'No strategic notes provided.' }}"</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

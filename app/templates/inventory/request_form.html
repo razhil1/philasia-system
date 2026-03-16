@@ -1,0 +1,39 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}New Requisition | PhilAsia Pro{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Material Requisition</h1>
+        <p class="text-muted mb-0">Initiate a resource request for your project site</p>
+    </div>
+    <a href="{{ url_for('main.request_list') }}" class="qb-outline-btn">Back to Requests</a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="qb-card p-5 border-top border-4 border-warning">
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-uppercase text-warning-emphasis">Assign to Project Site</label>
+                    {{ form.site_id(class="form-select rounded-2 py-2") }}
+                    <div class="extra-small text-muted mt-2">Only "Active" projects appear here.</div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="form-label fw-bold small text-uppercase">Requisition Notes / Urgency</label>
+                    {{ form.notes(class="form-control rounded-2", rows="4", placeholder="Explain the priority or special handling instructions for this request...") }}
+                </div>
+
+                <div class="d-flex justify-content-end gap-3 pt-4 border-top">
+                    <a href="{{ url_for('main.request_list') }}" class="qb-outline-btn px-4">Discard</a>
+                    {{ form.submit(class="btn btn-warning px-5 shadow-sm fw-bold rounded-pill") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

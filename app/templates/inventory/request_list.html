@@ -1,0 +1,73 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Material Requests | PhilAsia Pro{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Material Requests</h1>
+        <p class="text-muted mb-0">Project site requisitions pending fulfillment</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('main.request_create') }}" class="qb-primary-btn d-flex align-items-center gap-2 px-4 shadow-sm text-decoration-none" style="padding-top: 0.6rem; padding-bottom: 0.6rem;">
+            <i class="bi bi-file-earmark-plus"></i>
+            <span>New Requisition</span>
+        </a>
+    </div>
+</div>
+
+<div class="qb-card mb-4">
+    <div class="p-0">
+        <div class="table-responsive">
+            <table class="table qb-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Request Date</th>
+                        <th>Reference ID</th>
+                        <th>Project Site</th>
+                        <th>Status</th>
+                        <th>Requestor</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in requests %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="fw-bold small">{{ req.created_at.strftime('%d %b %Y') }}</div>
+                            <div class="extra-small text-muted">{{ req.created_at.strftime('%H:%M') }}</div>
+                        </td>
+                        <td><code class="extra-small text-primary fw-bold">#REQ-{{ 5000 + req.id }}</code></td>
+                        <td>
+                            <div class="fw-semibold small">{{ req.site.name }}</div>
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill {% if req.status == 'pending' %}bg-warning-subtle text-warning border-warning{% elif req.status == 'approved' %}bg-info-subtle text-info border-info{% else %}bg-success-subtle text-success border-success{% endif %} border extra-small px-3">
+                                {{ req.status.upper() }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="small text-muted">{{ req.user.username }}</span>
+                        </td>
+                        <td class="text-end pe-4">
+                            <a href="{{ url_for('main.request_detail', request_id=req.id) }}" class="btn btn-sm qb-outline-btn py-1 px-3">
+                                View Details
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <div class="py-4">
+                                <i class="bi bi-file-earmark-text fs-1 opacity-10 mb-3 d-block"></i>
+                                <h6 class="text-muted">No material requests found.</h6>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Register Facility | PhilAsia Pro{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Facility Registration</h1>
+        <p class="text-muted mb-0">Register a new central warehouse or storage hub</p>
+    </div>
+    <a href="{{ url_for('main.warehouse_list') }}" class="qb-outline-btn">Back to Facilities</a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="qb-card p-5">
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-uppercase">Facility Name</label>
+                    {{ form.name(class="form-control", placeholder="e.g., Main Distribution Hub - Laguna") }}
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-uppercase">Physical Address / Geo-Location</label>
+                    {{ form.location(class="form-control", placeholder="Enter complete office or warehouse address") }}
+                </div>
+
+                <div class="mb-5">
+                    <label class="form-label fw-bold small text-uppercase">Authority Contact Info</label>
+                    {{ form.contact_info(class="form-control", rows="3", placeholder="Warehouse manager details, phone numbers, operating hours...") }}
+                </div>
+
+                <div class="d-flex justify-content-end gap-3 pt-4 border-top">
+                    <a href="{{ url_for('main.warehouse_list') }}" class="qb-outline-btn px-4">Cancel</a>
+                    {{ form.submit(class="qb-primary-btn px-5 shadow-sm") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

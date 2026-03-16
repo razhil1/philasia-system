@@ -1,0 +1,81 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Financial & Inventory Reports | PhilAsia Pro{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Business Reports</h1>
+        <p class="text-muted mb-0">Consolidated analytics and regulatory compliance records</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="qb-outline-btn">Report Scheduling</button>
+        <button class="qb-primary-btn">Run Custom Query</button>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6 col-xl-4">
+        <div class="qb-card p-4 h-100">
+            <h6 class="fw-bold text-success mb-3"><i class="bi bi-graph-up-arrow me-2"></i>Inventory Valuation</h6>
+            <p class="small text-muted mb-4">Detailed breakdown of asset value across all facilities and sites.</p>
+            <div class="d-grid">
+                <button class="btn qb-outline-btn btn-sm text-start d-flex justify-content-between">
+                    <span>Summary by Category</span>
+                    <i class="bi bi-chevron-right extra-small"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-4">
+        <div class="qb-card p-4 h-100">
+            <h6 class="fw-bold text-primary mb-3"><i class="bi bi-clock-history me-2"></i>Resource Flow (Audit)</h6>
+            <p class="small text-muted mb-4">Comprehensive audit trail of every movement for the current fiscal year.</p>
+            <div class="d-grid">
+                <button class="btn qb-outline-btn btn-sm text-start d-flex justify-content-between">
+                    <span>Run Ledger Report</span>
+                    <i class="bi bi-chevron-right extra-small"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-4">
+        <div class="qb-card p-4 h-100">
+            <h6 class="fw-bold text-danger mb-3"><i class="bi bi-speedometer me-2"></i>Optimization Report</h6>
+            <p class="small text-muted mb-4">Identifies dead stock, high-velocity assets, and reordering requirements.</p>
+            <div class="d-grid">
+                <button class="btn qb-outline-btn btn-sm text-start d-flex justify-content-between">
+                    <span>View Optimization Data</span>
+                    <i class="bi bi-chevron-right extra-small"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-5">
+    <h6 class="fw-bold text-muted text-uppercase extra-small mb-3">Recent Reports Run</h6>
+    <div class="qb-card">
+        <div class="table-responsive">
+            <table class="table qb-table mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Report Name</th>
+                        <th>Period</th>
+                        <th>Format</th>
+                        <th class="text-end pe-4">Last Run</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="ps-4 fw-bold small text-primary">Monthly Stock Audit</td>
+                        <td class="small">March 2026</td>
+                        <td class="small px-2">PDF/Portable</td>
+                        <td class="text-end pe-4 small text-muted">2 hours ago</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}{{ title }} | PhilAsia Pro{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-1">{{ title }}</h1>
+        <p class="text-muted mb-0">Define asset specifications and reorder thresholds</p>
+    </div>
+    <a href="{{ url_for('main.item_list') }}" class="qb-outline-btn">Back to Catalog</a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="qb-card p-5">
+            <form method="POST" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+                
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold small text-uppercase">Asset SKU</label>
+                        {{ form.sku(class="form-control rounded-2", placeholder="e.g. WH-TOOL-001") }}
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-bold small text-uppercase">Product/Service Name</label>
+                        {{ form.name(class="form-control rounded-2", placeholder="Enter full descriptive name") }}
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-uppercase">Technical Description</label>
+                    {{ form.description(class="form-control rounded-2", rows="3", placeholder="Usage specifications, dimensions, etc.") }}
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold small text-uppercase">Primary Category</label>
+                        {{ form.category_id(class="form-select rounded-2") }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold small text-uppercase">Unit of Measure</label>
+                        {{ form.unit(class="form-control rounded-2", placeholder="e.g. Linear Meters") }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold small text-uppercase">Reorder Point</label>
+                        {{ form.reorder_level(class="form-control rounded-2") }}
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="form-label fw-bold small text-uppercase">Asset Visualization (Photo)</label>
+                    <div class="border rounded-4 p-4 text-center bg-light bg-opacity-50">
+                        <i class="bi bi-cloud-upload fs-1 text-muted mb-2"></i>
+                        {{ form.photo(class="form-control") }}
+                        <div class="extra-small text-muted mt-2">Recommended: 800x800px JPG/PNG</div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-3 pt-4 border-top">
+                    <a href="{{ url_for('main.item_list') }}" class="qb-outline-btn px-4">Cancel</a>
+                    {{ form.submit(class="qb-primary-btn px-5 shadow-sm") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
