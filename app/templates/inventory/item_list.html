@@ -1,9 +1,22 @@
 {% extends 'layouts/base.html' %}
 {% block title %}Items & Assets{% endblock %}
 {% block page_title %}Items & Assets{% endblock %}
+{% block extra_css %}
+<style>
+.badge-consumable { background:#dbeafe; color:#1e40af; font-weight:600; }
+.badge-asset      { background:#fef9c3; color:#92400e; font-weight:600; }
+.stock-asset  { font-weight:700; color:#0f766e; }
+.stock-low    { font-weight:700; color:#dc2626; }
+.stock-ok     { font-weight:600; color:#15803d; }
+.unit-label   { font-size:.72rem; color:#94a3b8; margin-left:2px; }
+</style>
+{% endblock %}
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-end">
-    <div><h1>Items & Assets</h1><p>Catalog of all tracked inventory items.</p></div>
+    <div>
+        <h1>Items &amp; Assets</h1>
+        <p>Catalog of all tracked inventory items.</p>
+    </div>
     {% if current_user.can('manage_inventory') %}
     <div class="d-flex gap-2">
         <a href="{{ url_for('main.item_import') }}" class="btn btn-outline-success">
@@ -16,11 +29,22 @@
     {% endif %}
 </div>
 
+<!-- Legend -->
+<div class="d-flex gap-3 mb-3 small text-muted">
+    <span><span class="badge badge-consumable me-1">Consumable</span> Tracked by quantity (kg, pcs, bags…)</span>
+    <span><span class="badge badge-asset me-1">Asset / Tool</span> Tracked individually — each unit has its own asset tag</span>
+</div>
+
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>{{ item_stats|length }} items in catalog</span>
-        <div class="d-flex gap-2">
-            <input class="form-control form-control-sm" type="search" id="itemSearch" placeholder="Search items..." style="width:220px;">
+        <div class="d-flex gap-2 align-items-center">
+            <div class="btn-group btn-group-sm" id="typeFilter">
+                <button type="button" class="btn btn-outline-secondary active" data-filter="all">All</button>
+                <button type="button" class="btn btn-outline-primary" data-filter="consumable">Consumables</button>
+                <button type="button" class="btn btn-outline-warning" data-filter="asset">Assets / Tools</button>
+            </div>
+            <input class="form-control form-control-sm" type="search" id="itemSearch" placeholder="Search items…" style="width:200px;">
             <a href="{{ url_for('main.report_low_stock') }}" class="btn btn-sm btn-outline-warning">
                 <i class="bi bi-exclamation-triangle me-1"></i>Low Stock
             </a>
@@ -29,17 +53,26 @@
     <div class="table-responsive">
     <table class="table mb-0" id="itemTable">
         <thead><tr>
-            <th>Photo</th><th>SKU</th><th>Name</th><th>Category</th>
-            <th>Unit</th><th>Total Stock</th><th>Unit Cost</th><th>Status</th><th></th>
+            <th style="width:42px">Photo</th>
+            <th>SKU</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Category</th>
+            <th>Total Stock</th>
+            <th>Unit Cost</th>
+            <th>Status</th>
+            <th></th>
         </tr></thead>
         <tbody>
         {% for s in item_stats %}
-        <tr class="{{ 'low-stock-row' if s.low }}">
+        <tr class="{{ 'low-stock-row' if s.low }}" data-type="{{ s.item.item_type }}">
             <td>
                 {% if s.item.photo %}
                 <img src="/static/uploads/{{ s.item.photo }}" class="rounded" style="width:36px;height:36px;object-fit:cover;" alt="">
                 {% else %}
-                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:36px;height:36px;"><i class="bi bi-box text-muted"></i></div>
+                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:36px;height:36px;">
+                    <i class="bi bi-{{ 'tools' if s.item.is_asset else 'box-seam' }} text-muted"></i>
+                </div>
                 {% endif %}
             </td>
             <td><code class="small">{{ s.item.sku }}</code></td>
@@ -47,9 +80,31 @@
                 <a href="{{ url_for('main.item_detail', item_id=s.item.id) }}" class="fw-semibold text-decoration-none row-link">{{ s.item.name }}</a>
                 {% if s.low %}<span class="badge bg-danger ms-1" style="font-size:.65rem;">Low</span>{% endif %}
             </td>
+            <td>
+                {% if s.item.is_asset %}
+                <span class="badge badge-asset"><i class="bi bi-tools me-1"></i>Asset / Tool</span>
+                {% else %}
+                <span class="badge badge-consumable"><i class="bi bi-box-seam me-1"></i>Consumable</span>
+                {% endif %}
+            </td>
             <td class="text-muted">{{ s.item.category.name if s.item.category else '—' }}</td>
-            <td class="text-muted">{{ s.item.unit }}</td>
-            <td class="{{ 'text-danger fw-bold' if s.low else 'fw-semibold' }}">{{ s.total_qty | round(2) }}</td>
+            <td>
+                {% if s.item.is_asset %}
+                    {# Assets: show unit COUNT (integer), link to their physical unit list #}
+                    <a href="{{ url_for('main.asset_unit_list', item_id=s.item.id) }}"
+                       class="text-decoration-none stock-asset"
+                       title="Click to manage individual units">
+                        {{ s.total_qty | int }} <span class="unit-label">units</span>
+                        <i class="bi bi-box-arrow-up-right ms-1" style="font-size:.7rem;"></i>
+                    </a>
+                {% else %}
+                    {# Consumables: show quantity + unit of measure #}
+                    <span class="{{ 'stock-low' if s.low else 'stock-ok' }}">
+                        {{ s.total_qty | round(2) }}
+                        <span class="unit-label">{{ s.item.unit }}</span>
+                    </span>
+                {% endif %}
+            </td>
             <td class="text-muted">₱{{ '{:,.2f}'.format(s.item.unit_cost | float) }}</td>
             <td><span class="badge {{ 'bg-success' if s.item.is_active else 'bg-secondary' }}">{{ 'Active' if s.item.is_active else 'Inactive' }}</span></td>
             <td>
@@ -68,11 +123,30 @@
 {% endblock %}
 {% block extra_js %}
 <script>
+// Text search
 document.getElementById('itemSearch').addEventListener('input', function() {
     const q = this.value.toLowerCase();
-    document.querySelectorAll('#itemTable tbody tr').forEach(r => {
-        r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+    filterRows();
+});
+
+// Type filter buttons
+let activeFilter = 'all';
+document.querySelectorAll('#typeFilter button').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('#typeFilter button').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        activeFilter = this.dataset.filter;
+        filterRows();
     });
 });
+
+function filterRows() {
+    const q = document.getElementById('itemSearch').value.toLowerCase();
+    document.querySelectorAll('#itemTable tbody tr[data-type]').forEach(r => {
+        const matchText = r.textContent.toLowerCase().includes(q);
+        const matchType = activeFilter === 'all' || r.dataset.type === activeFilter;
+        r.style.display = (matchText && matchType) ? '' : 'none';
+    });
+}
 </script>
 {% endblock %}
