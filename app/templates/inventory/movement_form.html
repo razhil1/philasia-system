@@ -1,145 +1,149 @@
 {% extends 'layouts/base.html' %}
-
-{% block title %}Stock Movement Ledger | PhilAsia Pro{% endblock %}
-
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-end mb-4">
-    <div>
-        <h1 class="h3 fw-bold mb-1">Stock Movement Authorization</h1>
-        <p class="text-muted mb-0">Record deliveries, transfers, and warehouse adjustments</p>
-    </div>
-    <a href="{{ url_for('main.movement_list') }}" class="qb-outline-btn">View Full Audit Log</a>
+<div class="page-header">
+    <h1>{{ title }}</h1>
+    <p>Post a new inventory transaction to the ledger.</p>
 </div>
-
 <div class="row justify-content-center">
-    <div class="col-lg-11">
-        <form method="POST" id="movementAuthForm">
-            {{ form.hidden_tag() }}
-            
-            <div class="row g-4">
-                <!-- Transaction Core -->
-                <div class="col-lg-4">
-                    <div class="qb-card p-4 h-100 border-start border-4 border-success">
-                        <h6 class="fw-bold text-uppercase small text-muted mb-4">1. Core Specifics</h6>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Transaction Type</label>
-                            {{ form.movement_type(class="form-select", id="mtype") }}
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Select Asset</label>
-                            {{ form.item_id(class="form-select") }}
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Quantity / Volume</label>
-                            {{ form.quantity(class="form-control", placeholder="0.00") }}
-                        </div>
-                    </div>
+<div class="col-lg-8">
+<form method="POST" id="movForm">
+    {{ form.hidden_tag() }}
+    <div class="card mb-3">
+        <div class="card-header">Transaction Details</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.movement_type.label.text }}</label>
+                    {{ form.movement_type(class='form-select', id='mtype') }}
                 </div>
-
-                <!-- Source Location -->
-                <div class="col-lg-4">
-                    <div class="qb-card p-4 h-100 bg-light bg-opacity-50">
-                        <h6 class="fw-bold text-uppercase small text-muted mb-4 uppercase">2. Origin (Source)</h6>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Source Type</label>
-                            {{ form.from_location_type(class="form-select", id="from_type") }}
-                        </div>
-                        <div id="from_wh_group" class="mb-3" style="display:none;">
-                            <label class="form-label small fw-bold">Select Warehouse</label>
-                            {{ form.from_warehouse_id(class="form-select") }}
-                        </div>
-                        <div id="from_site_group" class="mb-3" style="display:none;">
-                            <label class="form-label small fw-bold">Select Project Site</label>
-                            {{ form.from_site_id(class="form-select") }}
-                        </div>
-                        <p class="extra-small text-muted mt-3" id="from_hint">Leaving as N/A implies external sourcing (e.g., direct delivery from vendor).</p>
-                    </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.item_id.label.text }}</label>
+                    {{ form.item_id(class='form-select', id='itemSel') }}
                 </div>
-
-                <!-- Destination -->
-                <div class="col-lg-4">
-                    <div class="qb-card p-4 h-100 border-start border-4 border-primary">
-                        <h6 class="fw-bold text-uppercase small text-muted mb-4">3. Destination (Target)</h6>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Target Type</label>
-                            {{ form.to_location_type(class="form-select", id="to_type") }}
-                        </div>
-                        <div id="to_wh_group" class="mb-3">
-                            <label class="form-label small fw-bold">Select Warehouse</label>
-                            {{ form.to_warehouse_id(class="form-select") }}
-                        </div>
-                        <div id="to_site_group" class="mb-3" style="display:none;">
-                            <label class="form-label small fw-bold">Select Project Site</label>
-                            {{ form.to_site_id(class="form-select") }}
-                        </div>
-                    </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.quantity.label.text }}</label>
+                    {{ form.quantity(class='form-control') }}
+                    {% for e in form.quantity.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
                 </div>
-
-                <!-- Audit Details -->
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.unit_cost.label.text }} (₱)</label>
+                    {{ form.unit_cost(class='form-control', id='unitCost') }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ form.reference.label.text }}</label>
+                    {{ form.reference(class='form-control') }}
+                </div>
                 <div class="col-12">
-                    <div class="qb-card p-4">
-                        <h6 class="fw-bold text-uppercase small text-muted mb-4">4. Reference & Audit Trail</h6>
-                        <div class="row g-4">
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold">Purchase Order / Reference #</label>
-                                {{ form.reference(class="form-control", placeholder="e.g. PO-88902") }}
-                            </div>
-                            <div class="col-md-8">
-                                <label class="form-label small fw-bold">Authorization Notes</label>
-                                {{ form.notes(class="form-control", rows="2") }}
-                            </div>
-                        </div>
+                    <label class="form-label">{{ form.notes.label.text }}</label>
+                    {{ form.notes(class='form-control', rows=2) }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <!-- Source -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Source Location</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.from_location_type.label.text }}</label>
+                        {{ form.from_location_type(class='form-select', id='fromType') }}
+                    </div>
+                    <div id="fromWH" class="d-none">
+                        <label class="form-label">{{ form.from_warehouse_id.label.text }}</label>
+                        {{ form.from_warehouse_id(class='form-select') }}
+                    </div>
+                    <div id="fromST" class="d-none">
+                        <label class="form-label">{{ form.from_site_id.label.text }}</label>
+                        {{ form.from_site_id(class='form-select') }}
                     </div>
                 </div>
             </div>
-
-            <div class="d-flex justify-content-end gap-3 mt-4 pt-4 border-top border-secondary-subtle">
-                <a href="{{ url_for('main.movement_list') }}" class="qb-outline-btn px-4">Cancel Entry</a>
-                {{ form.submit(class="qb-primary-btn px-5 shadow") }}
+        </div>
+        <!-- Destination -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Destination Location</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.to_location_type.label.text }}</label>
+                        {{ form.to_location_type(class='form-select', id='toType') }}
+                    </div>
+                    <div id="toWH" class="d-none">
+                        <label class="form-label">{{ form.to_warehouse_id.label.text }}</label>
+                        {{ form.to_warehouse_id(class='form-select') }}
+                    </div>
+                    <div id="toST" class="d-none">
+                        <label class="form-label">{{ form.to_site_id.label.text }}</label>
+                        {{ form.to_site_id(class='form-select') }}
+                    </div>
+                </div>
             </div>
-        </form>
+        </div>
     </div>
+
+    <!-- Stock info panel -->
+    <div id="stockInfo" class="alert alert-info d-none mb-3">
+        <i class="bi bi-info-circle me-2"></i><span id="stockInfoText"></span>
+    </div>
+
+    <div class="d-flex gap-2">
+        {{ form.submit(class='btn btn-primary px-4') }}
+        <a href="{{ url_for('main.movement_list') }}" class="btn btn-outline-secondary px-4">Cancel</a>
+    </div>
+</form>
 </div>
-
+</div>
+{% endblock %}
+{% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const mtype = document.getElementById('mtype');
-        const fromType = document.getElementById('from_type');
-        const toType = document.getElementById('to_type');
-        
-        const fromWh = document.getElementById('from_wh_group');
-        const fromSite = document.getElementById('from_site_group');
-        const toWh = document.getElementById('to_wh_group');
-        const toSite = document.getElementById('to_site_group');
+function toggleLocFields(typeId, whId, stId) {
+    const val = document.getElementById(typeId).value;
+    document.getElementById(whId).classList.toggle('d-none', val !== 'warehouse');
+    document.getElementById(stId).classList.toggle('d-none', val !== 'site');
+}
 
-        function toggleInputs() {
-            // Source logic
-            fromWh.style.display = fromType.value === 'warehouse' ? 'block' : 'none';
-            fromSite.style.display = fromType.value === 'site' ? 'block' : 'none';
-            
-            // Target logic
-            toWh.style.display = toType.value === 'warehouse' ? 'block' : 'none';
-            toSite.style.display = toType.value === 'site' ? 'block' : 'none';
+document.getElementById('fromType').addEventListener('change', () => toggleLocFields('fromType','fromWH','fromST'));
+document.getElementById('toType').addEventListener('change', () => toggleLocFields('toType','toWH','toST'));
+toggleLocFields('fromType','fromWH','fromST');
+toggleLocFields('toType','toWH','toST');
+
+// Auto-populate unit cost from selected item
+document.getElementById('itemSel').addEventListener('change', function() {
+    fetch(`/api/stock/${this.value}`).then(r=>r.json()).then(data => {
+        const panel = document.getElementById('stockInfo');
+        if (data.length) {
+            const lines = data.map(d => `${d.location} (${d.location_type}): ${d.quantity}`).join(' | ');
+            document.getElementById('stockInfoText').textContent = 'Available stock — ' + lines;
+            panel.classList.remove('d-none');
+        } else {
+            panel.classList.add('d-none');
         }
+    }).catch(()=>{});
+});
 
-        mtype.addEventListener('change', function() {
-            if(this.value === 'delivery') {
-                fromType.value = 'none';
-                toType.value = 'warehouse';
-            } else if(this.value === 'pullout') {
-                fromType.value = 'site';
-                toType.value = 'warehouse';
-            } else if(this.value === 'transfer') {
-                fromType.value = 'warehouse';
-                toType.value = 'site';
-            }
-            toggleInputs();
-        });
-
-        fromType.addEventListener('change', toggleInputs);
-        toType.addEventListener('change', toggleInputs);
-        
-        toggleInputs(); // Init
-    });
+// Pre-set from/to based on movement type
+const typePresets = {
+    delivery: { from: 'external', to: 'warehouse' },
+    transfer: { from: 'warehouse', to: 'site' },
+    pullout:  { from: 'site',     to: 'warehouse' },
+    return:   { from: 'warehouse', to: 'external' },
+    consumption: { from: 'site', to: 'none' },
+    scrap:    { from: 'warehouse', to: 'none' },
+    adjustment: { from: 'none', to: 'none' },
+};
+document.getElementById('mtype').addEventListener('change', function() {
+    const p = typePresets[this.value];
+    if (p) {
+        document.getElementById('fromType').value = p.from;
+        document.getElementById('toType').value = p.to;
+        toggleLocFields('fromType','fromWH','fromST');
+        toggleLocFields('toType','toWH','toST');
+    }
+});
 </script>
 {% endblock %}

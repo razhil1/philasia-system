@@ -1,0 +1,40 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Stock Report{% endblock %}
+{% block page_title %}Stock Level Report{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div><h1>Stock Level Report</h1><p>Current inventory across all locations.</p></div>
+    <a href="{{ url_for('main.report_list') }}" class="btn btn-outline-secondary btn-sm">← Reports</a>
+</div>
+<div class="card">
+<div class="table-responsive">
+<table class="table table-sm mb-0">
+    <thead>
+        <tr>
+            <th>Item</th><th>SKU</th>
+            {% for wh in warehouses %}<th class="text-center" title="{{ wh.location }}">{{ wh.name }}</th>{% endfor %}
+            {% for site in sites %}<th class="text-center">{{ site.name }}</th>{% endfor %}
+            <th class="text-center">Total</th><th class="text-center">Threshold</th><th class="text-center">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for row in stock_data %}
+    <tr class="{{ 'low-stock-row' if row.item.is_low_stock() }}">
+        <td><a href="{{ url_for('main.item_detail', item_id=row.item.id) }}" class="fw-semibold text-decoration-none">{{ row.item.name }}</a></td>
+        <td><code class="small">{{ row.item.sku }}</code></td>
+        {% for wh in warehouses %}<td class="text-center">{{ row.warehouses.get(wh.id, 0) | round(1) }}</td>{% endfor %}
+        {% for site in sites %}<td class="text-center">{{ row.sites.get(site.id, 0) | round(1) }}</td>{% endfor %}
+        <td class="text-center fw-bold {{ 'text-danger' if row.item.is_low_stock() }}">{{ row.total | round(1) }} <span class="text-muted small">{{ row.item.unit }}</span></td>
+        <td class="text-center text-muted">{{ row.item.reorder_level }}</td>
+        <td class="text-center">
+            {% if row.item.is_low_stock() %}<span class="badge bg-danger">Low</span>{% else %}<span class="badge bg-success">OK</span>{% endif %}
+        </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="20" class="text-center text-muted py-4">No items in catalog.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+</div>
+{% endblock %}

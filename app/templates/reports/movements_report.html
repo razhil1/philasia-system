@@ -1,0 +1,74 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Movement Report{% endblock %}
+{% block page_title %}Movement Log Report{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div><h1>Movement Log Report</h1><p>Filtered audit trail of all inventory transactions.</p></div>
+    <a href="{{ url_for('main.report_list') }}" class="btn btn-outline-secondary btn-sm">← Reports</a>
+</div>
+
+<div class="card mb-3 p-3">
+    <form method="GET" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">From Date</label>
+            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from or '' }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">To Date</label>
+            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to or '' }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">Type</label>
+            <select name="type" class="form-select form-select-sm">
+                <option value="">All Types</option>
+                {% for k,v in movement_types.items() %}
+                <option value="{{ k }}" {{ 'selected' if mtype == k }}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-primary btn-sm w-100">Apply Filters</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between">
+        <span>{{ movements.total }} transactions · Total qty: {{ total_qty | round(2) }}</span>
+    </div>
+    <div class="table-responsive">
+    <table class="table table-sm mb-0">
+        <thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>From</th><th>To</th><th>Ref</th><th>By</th></tr></thead>
+        <tbody>
+        {% for m in movements.items %}
+        <tr>
+            <td class="small text-muted">{{ m.date.strftime('%b %d, %Y %H:%M') }}</td>
+            <td><span class="badge move-{{ m.movement_type }}">{{ m.type_label }}</span></td>
+            <td class="fw-semibold">{{ m.item.name }}</td>
+            <td>{{ m.quantity }} {{ m.item.unit }}</td>
+            <td class="small text-muted">{{ m.from_location_name() }}</td>
+            <td class="small text-muted">{{ m.to_location_name() }}</td>
+            <td class="small text-muted">{{ m.reference or '—' }}</td>
+            <td class="small text-muted">{{ m.created_by.username }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No movements for the selected filters.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if movements.pages > 1 %}
+    <div class="card-footer">
+        <nav><ul class="pagination pagination-sm mb-0">
+            {% for p in movements.iter_pages() %}
+                {% if p %}
+                <li class="page-item {{ 'active' if p == movements.page }}">
+                    <a class="page-link" href="{{ url_for('main.report_movements', page=p, date_from=date_from, date_to=date_to, type=mtype) }}">{{ p }}</a>
+                </li>
+                {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+            {% endfor %}
+        </ul></nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

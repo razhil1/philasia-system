@@ -1,43 +1,48 @@
 {% extends 'layouts/base.html' %}
-
-{% block title %}Register Facility | PhilAsia Pro{% endblock %}
-
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1 class="h3 fw-bold mb-1">Facility Registration</h1>
-        <p class="text-muted mb-0">Register a new central warehouse or storage hub</p>
-    </div>
-    <a href="{{ url_for('main.warehouse_list') }}" class="qb-outline-btn">Back to Facilities</a>
+<div class="page-header">
+    <h1>{{ title }}</h1>
+    <p><a href="{{ url_for('main.warehouse_list') }}">← Back to Warehouses</a></p>
 </div>
-
 <div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="qb-card p-5">
-            <form method="POST">
-                {{ form.hidden_tag() }}
-                
-                <div class="mb-4">
-                    <label class="form-label fw-bold small text-uppercase">Facility Name</label>
-                    {{ form.name(class="form-control", placeholder="e.g., Main Distribution Hub - Laguna") }}
+<div class="col-lg-6">
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="card">
+        <div class="card-header">Warehouse Details</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">{{ form.name.label.text }}</label>
+                    {{ form.name(class='form-control') }}
+                    {% for e in form.name.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
                 </div>
-
-                <div class="mb-4">
-                    <label class="form-label fw-bold small text-uppercase">Physical Address / Geo-Location</label>
-                    {{ form.location(class="form-control", placeholder="Enter complete office or warehouse address") }}
+                <div class="col-12">
+                    <label class="form-label">{{ form.location.label.text }}</label>
+                    {{ form.location(class='form-control') }}
                 </div>
-
-                <div class="mb-5">
-                    <label class="form-label fw-bold small text-uppercase">Authority Contact Info</label>
-                    {{ form.contact_info(class="form-control", rows="3", placeholder="Warehouse manager details, phone numbers, operating hours...") }}
+                <div class="col-12">
+                    <label class="form-label">{{ form.contact_person.label.text }}</label>
+                    {{ form.contact_person(class='form-control') }}
                 </div>
-
-                <div class="d-flex justify-content-end gap-3 pt-4 border-top">
-                    <a href="{{ url_for('main.warehouse_list') }}" class="qb-outline-btn px-4">Cancel</a>
-                    {{ form.submit(class="qb-primary-btn px-5 shadow-sm") }}
+                <div class="col-12">
+                    <label class="form-label">{{ form.contact_info.label.text }}</label>
+                    {{ form.contact_info(class='form-control', rows=3) }}
                 </div>
-            </form>
+                <div class="col-12">
+                    {{ form.is_active(class='form-check-input') }}
+                    <label class="ms-2 form-label">Active</label>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer d-flex gap-2">
+            {{ form.submit(class='btn btn-primary') }}
+            <a href="{{ url_for('main.warehouse_list') }}" class="btn btn-outline-secondary">Cancel</a>
         </div>
     </div>
+</form>
+</div>
 </div>
 {% endblock %}

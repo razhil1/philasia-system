@@ -1,0 +1,95 @@
+{% extends 'layouts/base.html' %}
+{% block title %}{{ item.name }}{% endblock %}
+{% block page_title %}Item Detail{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div>
+        <h1>{{ item.name }}</h1>
+        <p><code>{{ item.sku }}</code> · {{ item.category.name if item.category else 'Uncategorized' }}</p>
+    </div>
+    {% if current_user.can('manage_inventory') %}
+    <a href="{{ url_for('main.item_edit', item_id=item.id) }}" class="btn btn-outline-primary"><i class="bi bi-pencil me-1"></i>Edit</a>
+    {% endif %}
+</div>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center p-4">
+                {% if item.photo %}
+                <img src="/static/uploads/{{ item.photo }}" class="img-fluid rounded mb-3" style="max-height:180px;object-fit:contain;" alt="{{ item.name }}">
+                {% else %}
+                <div class="bg-light rounded d-flex align-items-center justify-content-center mb-3 mx-auto" style="width:120px;height:120px;"><i class="bi bi-box fs-1 text-muted"></i></div>
+                {% endif %}
+                <h5 class="fw-bold">{{ item.name }}</h5>
+                <p class="text-muted small">{{ item.description or 'No description.' }}</p>
+            </div>
+            <div class="card-body border-top">
+                <div class="row g-2">
+                    <div class="col-6"><div class="detail-label">SKU</div><div class="detail-val"><code>{{ item.sku }}</code></div></div>
+                    <div class="col-6"><div class="detail-label">Unit</div><div class="detail-val">{{ item.unit }}</div></div>
+                    <div class="col-6"><div class="detail-label">Unit Cost</div><div class="detail-val">₱{{ '{:,.2f}'.format(item.unit_cost|float) }}</div></div>
+                    <div class="col-6"><div class="detail-label">Min Stock</div><div class="detail-val">{{ item.reorder_level }}</div></div>
+                    <div class="col-12"><div class="detail-label">Status</div>
+                        <span class="badge {{ 'bg-success' if item.is_active else 'bg-secondary' }}">{{ 'Active' if item.is_active else 'Inactive' }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">Stock by Location</div>
+            <div class="table-responsive">
+            <table class="table mb-0">
+                <thead><tr><th>Location</th><th>Type</th><th>Quantity</th><th>Value</th></tr></thead>
+                <tbody>
+                {% for s in stocks %}
+                <tr>
+                    <td class="fw-semibold">{{ s.location_name() }}</td>
+                    <td><span class="badge bg-{{ 'info' if s.location_type == 'site' else 'primary' }} bg-opacity-15 text-{{ 'info' if s.location_type == 'site' else 'primary' }}">{{ s.location_type.title() }}</span></td>
+                    <td class="{{ 'text-danger fw-bold' if s.quantity|float < item.reorder_level|float else '' }}">{{ s.quantity | round(2) }} {{ item.unit }}</td>
+                    <td class="text-muted">₱{{ '{:,.2f}'.format(s.quantity|float * item.unit_cost|float) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center text-muted py-3">No stock recorded.</td></tr>
+                {% endfor %}
+                <tr class="table-light fw-bold">
+                    <td colspan="2">Total</td>
+                    <td>{{ item.total_stock() | round(2) }} {{ item.unit }}</td>
+                    <td>₱{{ '{:,.2f}'.format(item.total_stock() * item.unit_cost|float) }}</td>
+                </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Recent Movements</span>
+                <a href="{{ url_for('main.movement_create') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Post Movement</a>
+            </div>
+            <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Date</th><th>Type</th><th>Qty</th><th>From</th><th>To</th><th>By</th></tr></thead>
+                <tbody>
+                {% for m in movements %}
+                <tr>
+                    <td class="text-muted small">{{ m.date.strftime('%b %d, %Y') }}</td>
+                    <td><span class="badge move-{{ m.movement_type }}">{{ m.type_label }}</span></td>
+                    <td>{{ m.quantity }}</td>
+                    <td class="text-muted small">{{ m.from_location_name() }}</td>
+                    <td class="text-muted small">{{ m.to_location_name() }}</td>
+                    <td class="text-muted small">{{ m.created_by.username }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-3">No movements yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

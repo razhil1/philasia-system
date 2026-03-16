@@ -1,51 +1,74 @@
-# PhilAsia Pro: Inventory & Project Management System
+# PhilAsia Pro — Inventory & Operations System
 
 ## Overview
-A professional, movement-based inventory management system for industrial and construction operations. Uses a transactional ledger approach — all stock levels are derived from a complete audit trail of movements.
+A comprehensive movement-based inventory management system for companies managing warehouses and project sites. Built with Python Flask, PostgreSQL, and Bootstrap 5.
 
-## Architecture
-- **Framework**: Flask (Application Factory Pattern, Blueprints)
-- **Database**: PostgreSQL (via `DATABASE_URL` env var) with SQLAlchemy ORM
-- **Auth**: Flask-Login with role-based access (admin flag on User)
-- **Forms**: Flask-WTF with CSRF protection
-- **UI**: Jinja2 templates with Bootstrap 5
+## Tech Stack
+- **Backend**: Flask (Application Factory + Blueprints)
+- **Database**: PostgreSQL (via DATABASE_URL env var) with SQLAlchemy ORM
+- **Auth**: Flask-Login + CSRF protection
+- **Forms**: Flask-WTF
+- **UI**: Bootstrap 5 + Bootstrap Icons + Chart.js
+
+## Key Features
+- **Dashboard** with live charts (7-day movement trends), low-stock alerts, recent activity
+- **Inventory Catalog** — Items with SKU, category, unit cost, photo, reorder threshold
+- **7 Movement Types** — Delivery, Transfer, Pullout, Adjustment, Return, Consumption, Scrap
+- **Stock Ledger** — All quantities calculated from transaction history (immutable audit trail)
+- **Warehouses** — Multiple storage facilities with stock tracking and value calculation
+- **Project Sites** — Client sites with budget, status, inventory, and requisition tracking
+- **Material Requisitions** — Full workflow: submit → approve/reject → fulfill (auto-transfers stock)
+- **Reports** — Stock levels matrix, movement log with filters, low stock alerts
+- **User Management** — 7 roles with permission-based access control (admin only)
+- **Profile** — Password change for all users
+
+## User Roles
+| Role | Key Permissions |
+|------|----------------|
+| admin | Full access including user management |
+| project_manager | Manage sites, approve requests, manage movements |
+| delivery_guy | Post movements only |
+| accounting | View reports, view sites |
+| finance_manager | View reports, approve requests |
+| stock_clerk | Manage inventory, post movements, manage warehouses |
+| viewer | Read-only (own requests only) |
 
 ## Project Structure
 ```
 app/
 ├── auth/           # Auth blueprint (login/logout)
-├── templates/      # Jinja2 HTML templates
-│   ├── auth/
-│   ├── inventory/
-│   └── layouts/
-├── __init__.py     # App factory (create_app)
-├── forms.py        # WTForms form definitions
-├── models.py       # SQLAlchemy models
-└── routes.py       # Main blueprint routes
-config.py           # Config class (reads env vars)
-init_db.py          # DB schema init + seed data
-run.py              # Entry point (host=0.0.0.0, port=5000)
+│   ├── __init__.py
+│   ├── forms.py
+│   └── routes.py
+├── templates/
+│   ├── auth/         # login.html
+│   ├── inventory/    # dashboard, items, warehouses, sites, movements, requests, categories, overview
+│   ├── reports/      # stock, movements, low-stock reports
+│   ├── users/        # user management, profile
+│   └── layouts/      # base.html
+├── static/
+│   └── uploads/      # item photos
+├── __init__.py       # App factory
+├── forms.py          # WTForms definitions
+├── models.py         # SQLAlchemy models
+└── routes.py         # All business routes + RBAC decorators
+config.py             # Config (reads DATABASE_URL, SECRET_KEY)
+init_db.py            # Schema init + seed data
+run.py                # Entry point (host=0.0.0.0, port=5000)
 ```
 
-## Key Models
-- **User**: Auth with admin flag, manages project sites
-- **Category**: Hierarchical item categories
-- **Item**: Asset catalog (SKU, unit, reorder level, photo)
-- **Warehouse**: Storage facilities
-- **ProjectSite**: Construction project sites
-- **Stock**: Current quantity per item per location (warehouse or site)
-- **Movement**: Immutable ledger entries (delivery, transfer, pullout, adjustment)
-- **Request / RequestItem**: Material requisitions from site managers
-
 ## Running
-- Dev: `python3 run.py` (port 5000, 0.0.0.0)
+- Dev server: `python3 run.py`
 - Production: `gunicorn --bind=0.0.0.0:5000 --reuse-port run:app`
 
-## Database Setup
-- Uses Replit's built-in PostgreSQL (`DATABASE_URL` env var set automatically)
-- Run `python3 init_db.py` to create tables and seed admin user + default categories
-- Default admin: username=`admin`, password=`admin123`
+## Database
+- Replit built-in PostgreSQL via DATABASE_URL env var
+- Run `python3 init_db.py` to create/migrate schema and seed admin user
+- Default admin: `admin` / `admin123`
+- Demo users: `pm_demo`, `clerk_demo`, `viewer_demo`, `delivery_demo` — all password `password123`
 
 ## Notes
-- `password_hash` column uses `String(256)` (not 128) to accommodate scrypt hashes
-- File uploads stored in `app/static/uploads/` (created automatically)
+- `password_hash` uses String(256) to accommodate scrypt hashes
+- RBAC uses `current_user.can('permission')` pattern via decorator
+- Stock is updated atomically on every movement post
+- Requisition fulfillment automatically creates transfer movements

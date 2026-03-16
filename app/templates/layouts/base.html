@@ -3,356 +3,271 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}PhilAsia Pro | ERP & Inventory{% endblock %}</title>
-    <!-- Premium Fonts -->
+    <title>{% block title %}PhilAsia Pro{% endblock %} | Inventory System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Bootstrap 5 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --qb-green: #2ca01c;
-            --qb-green-hover: #218314;
-            --qb-sidebar-bg: #2d3138;
-            --qb-gray-light: #f4f5f8;
-            --qb-border: #d4d7dc;
-            --qb-text-main: #393a3d;
-            --qb-text-muted: #8d9096;
-            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            --primary: #1a6fd4;
+            --primary-dark: #145ab0;
+            --sidebar-bg: #111827;
+            --sidebar-text: rgba(255,255,255,.7);
+            --sidebar-active: #1a6fd4;
+            --surface: #fff;
+            --bg: #f0f4f8;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --muted: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --sidebar-w: 240px;
         }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; min-height: 100vh; }
 
-        body {
-            font-family: 'Public Sans', sans-serif;
-            background-color: var(--qb-gray-light);
-            color: var(--qb-text-main);
-            margin: 0;
-            display: flex;
-            overflow-x: hidden;
-        }
+        /* Sidebar */
+        .sidebar { width: var(--sidebar-w); background: var(--sidebar-bg); color: var(--sidebar-text); display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 1040; overflow-y: auto; }
+        .sidebar-brand { padding: 1.25rem 1.25rem 1rem; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; color: #fff; border-bottom: 1px solid rgba(255,255,255,.08); text-decoration: none; }
+        .sidebar-brand .brand-icon { width: 32px; height: 32px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #fff; flex-shrink: 0; }
+        .sidebar-user { padding: .9rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,.06); }
+        .sidebar-user .name { font-weight: 600; color: #fff; font-size: .88rem; }
+        .sidebar-user .role-badge { font-size: .72rem; background: rgba(255,255,255,.1); padding: .15rem .5rem; border-radius: 20px; color: rgba(255,255,255,.7); margin-top: .2rem; display: inline-block; }
+        .sidebar-section { padding: .75rem 1.25rem .3rem; font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.3); }
+        .nav-item-s a { display: flex; align-items: center; gap: 10px; padding: .6rem 1.25rem; color: var(--sidebar-text); text-decoration: none; font-size: .875rem; font-weight: 500; border-left: 3px solid transparent; transition: all .15s; }
+        .nav-item-s a:hover { background: rgba(255,255,255,.04); color: #fff; }
+        .nav-item-s a.active { background: rgba(26,111,212,.15); color: #fff; border-left-color: var(--primary); }
+        .nav-item-s a i { font-size: 1rem; width: 20px; text-align: center; }
+        .sidebar-bottom { margin-top: auto; padding: 1rem 1.25rem; border-top: 1px solid rgba(255,255,255,.06); }
 
-        /* Modernized Sidebar */
-        .sidebar {
-            width: 240px;
-            height: 100vh;
-            position: fixed;
-            background: var(--qb-sidebar-bg);
-            color: white;
-            display: flex;
-            flex-direction: column;
-            z-index: 1050;
-            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
-        }
+        /* Main layout */
+        .main-wrap { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .topbar { height: 58px; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .topbar-title { font-weight: 700; font-size: 1rem; color: var(--text); }
+        .page-content { padding: 1.5rem; flex: 1; }
 
-        .sidebar-brand {
-            padding: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-weight: 700;
-            font-size: 1.25rem;
-            color: white;
-            text-decoration: none;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
+        /* Cards */
+        .card { border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+        .card-header { background: transparent; border-bottom: 1px solid var(--border); padding: .9rem 1.25rem; font-weight: 600; }
+        .stat-card { border-radius: 12px; padding: 1.25rem; background: var(--surface); border: 1px solid var(--border); }
+        .stat-card .stat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .stat-card .stat-num { font-size: 1.9rem; font-weight: 700; line-height: 1.1; margin-top: .4rem; }
+        .stat-card .stat-label { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 
-        .new-btn-wrapper {
-            padding: 1.5rem;
-        }
+        /* Table */
+        .table { font-size: .875rem; }
+        .table th { font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 2px solid var(--border); }
+        .table td { vertical-align: middle; border-bottom: 1px solid var(--border); }
+        .table tbody tr:hover { background: #f8fafc; }
 
-        .btn-quick-new {
-            background-color: var(--qb-green);
-            color: white;
-            border: none;
-            padding: 0.75rem;
-            width: 100%;
-            border-radius: 50px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            transition: var(--transition);
-            box-shadow: 0 4px 12px rgba(44, 160, 28, 0.2);
-        }
+        /* Badges */
+        .badge { font-size: .72rem; font-weight: 600; padding: .3em .65em; border-radius: 6px; }
 
-        .btn-quick-new:hover {
-            background-color: var(--qb-green-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(44, 160, 28, 0.3);
-            color: white;
-        }
+        /* Buttons */
+        .btn { border-radius: 8px; font-weight: 500; font-size: .875rem; }
+        .btn-sm { font-size: .8rem; padding: .3rem .65rem; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
 
-        .nav-section {
-            padding: 0;
-            margin: 0;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
+        /* Forms */
+        .form-label { font-weight: 600; font-size: .82rem; color: var(--text); margin-bottom: .3rem; }
+        .form-control, .form-select { border-radius: 8px; border: 1px solid var(--border); font-size: .875rem; }
+        .form-control:focus, .form-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,111,212,.12); }
+        .form-section { background: var(--bg); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+        .form-section-title { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 1rem; }
 
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 0.85rem 1.5rem;
-            color: rgba(255,255,255,0.7);
-            text-decoration: none;
-            font-size: 0.95rem;
-            font-weight: 500;
-            transition: var(--transition);
-            border-left: 4px solid transparent;
-        }
+        /* Alert */
+        .alert { border-radius: 10px; font-size: .875rem; }
 
-        .nav-link:hover {
-            background: rgba(255,255,255,0.03);
-            color: white;
-        }
+        /* Movement type badges */
+        .move-delivery { background: #dcfce7; color: #15803d; }
+        .move-transfer { background: #dbeafe; color: #1d4ed8; }
+        .move-pullout { background: #e0f2fe; color: #0369a1; }
+        .move-adjustment { background: #fef9c3; color: #92400e; }
+        .move-return { background: #f1f5f9; color: #475569; }
+        .move-consumption { background: #fee2e2; color: #b91c1c; }
+        .move-scrap { background: #f3f4f6; color: #374151; }
 
-        .nav-link.active {
-            background: rgba(255,255,255,0.05);
-            color: white;
-            border-left-color: var(--qb-green);
-        }
+        /* Status pills */
+        .status-planned { background: #f1f5f9; color: #475569; }
+        .status-active { background: #dcfce7; color: #15803d; }
+        .status-on_hold { background: #fef9c3; color: #92400e; }
+        .status-completed { background: #dbeafe; color: #1d4ed8; }
+        .status-pending { background: #fef9c3; color: #92400e; }
+        .status-approved { background: #e0f2fe; color: #0369a1; }
+        .status-fulfilled { background: #dcfce7; color: #15803d; }
+        .status-rejected { background: #fee2e2; color: #b91c1c; }
+        .status-partial { background: #dbeafe; color: #1d4ed8; }
 
-        .nav-link i {
-            font-size: 1.15rem;
-        }
+        /* Priority */
+        .pri-low { background: #f1f5f9; color: #475569; }
+        .pri-normal { background: #e0f2fe; color: #0369a1; }
+        .pri-high { background: #fef9c3; color: #92400e; }
+        .pri-urgent { background: #fee2e2; color: #b91c1c; }
 
-        /* Refined Top Bar */
-        .top-navbar {
-            height: 64px;
-            background: white;
-            border-bottom: 1px solid var(--qb-border);
-            width: calc(100% - 240px);
-            position: fixed;
-            left: 240px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 2rem;
-            z-index: 1040;
-        }
+        /* Low stock alert row */
+        .low-stock-row { background: #fff7f7 !important; }
 
-        .search-container {
-            position: relative;
-            width: 400px;
-        }
+        .page-header { margin-bottom: 1.5rem; }
+        .page-header h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: .15rem; }
+        .page-header p { color: var(--muted); font-size: .875rem; margin: 0; }
 
-        .search-container i {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--qb-text-muted);
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 0.5rem 1rem 0.5rem 2.5rem;
-            background: var(--qb-gray-light);
-            border: 1px solid transparent;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            outline: none;
-            transition: var(--transition);
-        }
-
-        .search-input:focus {
-            background: white;
-            border-color: var(--qb-green);
-            box-shadow: 0 0 0 4px rgba(44, 160, 28, 0.1);
-        }
-
-        /* Main Viewport */
-        .content-area {
-            margin-left: 240px;
-            margin-top: 64px;
-            padding: 2.5rem;
-            width: calc(100% - 240px);
-            min-height: calc(100vh - 64px);
-        }
-
-        /* Components */
-        .qb-card {
-            border: 1px solid var(--qb-border);
-            border-radius: 8px;
-            background: white;
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .qb-card-header {
-            padding: 1.25rem 1.5rem;
-            border-bottom: 1px solid var(--qb-border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .qb-table thead th {
-            background: var(--qb-gray-light);
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.725rem;
-            letter-spacing: 0.05rem;
-            color: var(--qb-text-muted);
-            padding: 1rem;
-            border-bottom: 1px solid var(--qb-border);
-        }
-
-        .qb-primary-btn {
-            background: var(--qb-green);
-            color: white;
-            font-weight: 600;
-            border: none;
-            padding: 0.5rem 1.25rem;
-            border-radius: 50px;
-        }
-
-        .qb-outline-btn {
-            border: 1px solid var(--qb-border);
-            color: var(--qb-text-main);
-            background: white;
-            font-weight: 600;
-            padding: 0.5rem 1.25rem;
-            border-radius: 4px;
-        }
-
-        .qb-outline-btn:hover {
-            background: var(--qb-gray-light);
-        }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; flex-shrink: 0; }
+        .detail-label { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+        .detail-val { font-size: .9rem; font-weight: 500; }
+        a.row-link:hover { text-decoration: underline; color: var(--primary); }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <div class="sidebar">
-        <a href="{{ url_for('main.dashboard') }}" class="sidebar-brand">
-            <i class="bi bi-shield-lock-fill text-success"></i>
-            <span>PhilAsia Pro</span>
+<nav class="sidebar">
+    <a href="{{ url_for('main.dashboard') }}" class="sidebar-brand">
+        <div class="brand-icon"><i class="bi bi-boxes"></i></div>
+        PhilAsia Pro
+    </a>
+    <div class="sidebar-user">
+        <div class="name">{{ current_user.display_name }}</div>
+        <span class="role-badge">{{ current_user.role_display }}</span>
+    </div>
+
+    <div class="sidebar-section">Main</div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.dashboard') }}" class="{{ 'active' if request.endpoint == 'main.dashboard' }}">
+            <i class="bi bi-speedometer2"></i> Dashboard
         </a>
-        
-        <div class="new-btn-wrapper">
-            <div class="dropdown">
-                <button class="btn-quick-new" type="button" data-bs-toggle="dropdown">
-                    <i class="bi bi-plus-lg fs-5"></i>
-                    <span>Quick Create</span>
-                </button>
-                <ul class="dropdown-menu border-0 shadow-lg p-3 rounded-4" style="min-width: 250px;">
-                    <li class="small text-muted mb-2 ps-3">INVENTORY</li>
-                    <li><a class="dropdown-item rounded-3 py-2" href="{{ url_for('main.item_create') }}"><i class="bi bi-box-seam me-2"></i>New Product/Service</a></li>
-                    <li><a class="dropdown-item rounded-3 py-2" href="{{ url_for('main.movement_create') }}"><i class="bi bi-arrow-left-right me-2"></i>Stock Transfer</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li class="small text-muted mb-2 ps-3">VENDORS</li>
-                    <li><a class="dropdown-item rounded-3 py-2" href="{{ url_for('main.movement_create') }}"><i class="bi bi-file-earmark-plus me-2"></i>Purchase Order (Entry)</a></li>
-                    <li><a class="dropdown-item rounded-3 py-2" href="{{ url_for('main.warehouse_create') }}"><i class="bi bi-building me-2"></i>New Warehouse</a></li>
-                    <li><a class="dropdown-item rounded-3 py-2" href="{{ url_for('main.site_create') }}"><i class="bi bi-pin-map-fill me-2"></i>Authorize Site</a></li>
-                </ul>
-            </div>
+    </div>
+
+    <div class="sidebar-section">Inventory</div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.item_list') }}" class="{{ 'active' if 'item' in (request.endpoint or '') }}">
+            <i class="bi bi-box-seam"></i> Items & Assets
+        </a>
+    </div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.inventory_overview') }}" class="{{ 'active' if request.endpoint == 'main.inventory_overview' }}">
+            <i class="bi bi-layout-text-sidebar-reverse"></i> Stock Overview
+        </a>
+    </div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.category_list') }}" class="{{ 'active' if 'category' in (request.endpoint or '') }}">
+            <i class="bi bi-tags"></i> Categories
+        </a>
+    </div>
+
+    <div class="sidebar-section">Operations</div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.movement_list') }}" class="{{ 'active' if 'movement' in (request.endpoint or '') }}">
+            <i class="bi bi-arrow-left-right"></i> Movements
+        </a>
+    </div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.request_list') }}" class="{{ 'active' if 'request' in (request.endpoint or '') }}">
+            <i class="bi bi-clipboard2-check"></i> Requisitions
+            {% set pending = namespace(count=0) %}
+            {% if current_user.can('approve_requests') %}
+                {# Pending badge would be injected here via context processor in production #}
+            {% endif %}
+        </a>
+    </div>
+
+    <div class="sidebar-section">Locations</div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.warehouse_list') }}" class="{{ 'active' if 'warehouse' in (request.endpoint or '') }}">
+            <i class="bi bi-building"></i> Warehouses
+        </a>
+    </div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.site_list') }}" class="{{ 'active' if 'site' in (request.endpoint or '') }}">
+            <i class="bi bi-geo-alt"></i> Project Sites
+        </a>
+    </div>
+
+    <div class="sidebar-section">Reports</div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.report_stock') }}" class="{{ 'active' if request.endpoint == 'main.report_stock' }}">
+            <i class="bi bi-table"></i> Stock Levels
+        </a>
+    </div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.report_movements') }}" class="{{ 'active' if request.endpoint == 'main.report_movements' }}">
+            <i class="bi bi-bar-chart-line"></i> Movement Log
+        </a>
+    </div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.report_low_stock') }}" class="{{ 'active' if request.endpoint == 'main.report_low_stock' }}">
+            <i class="bi bi-exclamation-triangle"></i> Low Stock Alerts
+        </a>
+    </div>
+
+    {% if current_user.can('manage_users') %}
+    <div class="sidebar-section">Admin</div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.user_list') }}" class="{{ 'active' if 'user' in (request.endpoint or '') and request.endpoint != 'main.profile' }}">
+            <i class="bi bi-people"></i> User Management
+        </a>
+    </div>
+    {% endif %}
+
+    <div class="sidebar-bottom">
+        <div class="nav-item-s" style="margin: 0 -1.25rem;">
+            <a href="{{ url_for('main.profile') }}" class="{{ 'active' if request.endpoint == 'main.profile' }}">
+                <i class="bi bi-person-gear"></i> My Profile
+            </a>
         </div>
-
-        <nav class="nav-section">
-            <a href="{{ url_for('main.dashboard') }}" class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}">
-                <i class="bi bi-speedometer2"></i>
-                <span>Dashboard</span>
-            </a>
-            <a href="{{ url_for('main.item_list') }}" class="nav-link {% if 'item' in request.path %}active{% endif %}">
-                <i class="bi bi-boxes"></i>
-                <span>Inventory Items</span>
-            </a>
-            <a href="{{ url_for('main.warehouse_list') }}" class="nav-link {% if 'warehouse' in request.path %}active{% endif %}">
-                <i class="bi bi-building-gear"></i>
-                <span>Warehouses</span>
-            </a>
-            <a href="{{ url_for('main.site_list') }}" class="nav-link {% if 'site' in request.path %}active{% endif %}">
-                <i class="bi bi-geo-alt"></i>
-                <span>Project Sites</span>
-            </a>
-            <a href="{{ url_for('main.movement_list') }}" class="nav-link {% if 'movement' in request.path %}active{% endif %}">
-                <i class="bi bi-clock-history"></i>
-                <span>Audit Trail</span>
-            </a>
-            <div class="mt-auto">
-                <a href="{{ url_for('main.report_list') }}" class="nav-link {% if 'report' in request.path %}active{% endif %}">
-                    <i class="bi bi-file-earmark-bar-graph"></i>
-                    <span>Financial Reports</span>
-                </a>
-            </div>
-        </nav>
-
-        <div class="p-3 border-top border-secondary">
-            <a href="{{ url_for('auth.logout') }}" class="nav-link py-2">
-                <i class="bi bi-box-arrow-left"></i>
-                <span>Sign Out</span>
+        <div class="nav-item-s" style="margin: 0 -1.25rem;">
+            <a href="{{ url_for('auth.logout') }}">
+                <i class="bi bi-box-arrow-right"></i> Sign Out
             </a>
         </div>
     </div>
+</nav>
 
-    <header class="top-navbar">
-        <div class="search-container">
-            <i class="bi bi-search"></i>
-            <input type="text" class="search-input" placeholder="Search transactions, items, or sites...">
-        </div>
-        
-        <div class="d-flex align-items-center gap-4">
-            <div class="d-flex gap-3 text-secondary fs-5">
-                <i class="bi bi-question-circle cursor-pointer" title="Help"></i>
-                <i class="bi bi-bell cursor-pointer" title="Notifications"></i>
-                <i class="bi bi-gear-wide-connected cursor-pointer" title="Settings"></i>
+<div class="main-wrap">
+    <div class="topbar">
+        <span class="topbar-title">{% block page_title %}{% endblock %}</span>
+        <div class="d-flex align-items-center gap-3">
+            <div class="dropdown">
+                <button class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-plus-lg me-1"></i> New
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                    <li><a class="dropdown-item" href="{{ url_for('main.movement_create') }}"><i class="bi bi-arrow-left-right me-2"></i>Post Movement</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('main.request_create') }}"><i class="bi bi-clipboard2-plus me-2"></i>New Requisition</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    {% if current_user.can('manage_inventory') %}
+                    <li><a class="dropdown-item" href="{{ url_for('main.item_create') }}"><i class="bi bi-box-seam me-2"></i>Add Item</a></li>
+                    {% endif %}
+                    {% if current_user.can('manage_sites') %}
+                    <li><a class="dropdown-item" href="{{ url_for('main.site_create') }}"><i class="bi bi-geo-alt me-2"></i>New Site</a></li>
+                    {% endif %}
+                </ul>
             </div>
-            <div class="vr mx-2 h-25"></div>
-            <div class="d-flex align-items-center gap-2">
-                <div class="avatar-circle">
-                    {{ current_user.username[:1].upper() }}
-                </div>
-                <div class="d-none d-xl-block">
-                    <div class="fw-bold small">{{ current_user.username }}</div>
-                    <div class="text-muted extra-small">Administrator</div>
-                </div>
-            </div>
+            <div class="avatar">{{ current_user.username[:1].upper() }}</div>
         </div>
-    </header>
+    </div>
 
-    <main class="content-area">
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                <div class="alert alert-info border-0 shadow-sm rounded-3 d-flex align-items-center mb-4">
-                    <i class="bi bi-info-circle-fill me-2 fs-5"></i>
-                    {{ message }}
-                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
-                </div>
-                {% endfor %}
-            {% endif %}
+    <div class="page-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for cat, msg in messages %}
+            <div class="alert alert-{{ cat if cat != 'message' else 'info' }} alert-dismissible fade show d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-{{ 'check-circle' if cat == 'success' else 'exclamation-circle' if cat == 'danger' else 'info-circle' }}"></i>
+                {{ msg }}
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
         {% endwith %}
 
         {% block content %}{% endblock %}
-    </main>
+    </div>
+</div>
 
-    <style>
-        .avatar-circle {
-            width: 36px;
-            height: 36px;
-            background: var(--qb-green);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 0.85rem;
-        }
-        .extra-small {
-            font-size: 0.75rem;
-        }
-        .cursor-pointer { cursor: pointer; }
-    </style>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    {% block extra_js %}{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,37 @@
+{% extends 'layouts/base.html' %}
+{% block title %}{{ wh.name }}{% endblock %}
+{% block page_title %}Warehouse Stock{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div>
+        <h1>{{ wh.name }}</h1>
+        <p><i class="bi bi-geo-alt me-1"></i>{{ wh.location }} {% if wh.contact_person %} · {{ wh.contact_person }}{% endif %}</p>
+    </div>
+    {% if current_user.can('manage_warehouses') %}
+    <a href="{{ url_for('main.warehouse_edit', wh_id=wh.id) }}" class="btn btn-outline-primary"><i class="bi bi-pencil me-1"></i>Edit</a>
+    {% endif %}
+</div>
+<div class="card">
+    <div class="card-header">Current Stock — {{ stocks|length }} items</div>
+    <div class="table-responsive">
+    <table class="table mb-0">
+        <thead><tr><th>Item</th><th>SKU</th><th>Category</th><th>Quantity</th><th>Unit</th><th>Value</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for s in stocks %}
+        <tr class="{{ 'low-stock-row' if s.item.is_low_stock() }}">
+            <td><a href="{{ url_for('main.item_detail', item_id=s.item.id) }}" class="fw-semibold text-decoration-none row-link">{{ s.item.name }}</a></td>
+            <td><code class="small">{{ s.item.sku }}</code></td>
+            <td class="text-muted">{{ s.item.category.name if s.item.category else '—' }}</td>
+            <td class="fw-semibold {{ 'text-danger' if s.item.is_low_stock() }}">{{ s.quantity | round(2) }}</td>
+            <td class="text-muted">{{ s.item.unit }}</td>
+            <td class="text-muted">₱{{ '{:,.2f}'.format(s.quantity|float * s.item.unit_cost|float) }}</td>
+            <td>{% if s.item.is_low_stock() %}<span class="badge bg-danger">Low Stock</span>{% else %}<span class="badge bg-success">OK</span>{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No stock in this warehouse.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}

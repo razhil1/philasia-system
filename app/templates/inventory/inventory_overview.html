@@ -1,0 +1,31 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Stock Overview{% endblock %}
+{% block page_title %}Stock Overview{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div><h1>Stock Overview</h1><p>All items with quantity > 0 across all locations.</p></div>
+    <a href="{{ url_for('main.report_stock') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-table me-1"></i>Full Stock Report</a>
+</div>
+<div class="card">
+<div class="table-responsive">
+<table class="table mb-0" id="stockTbl">
+    <thead><tr><th>Item</th><th>SKU</th><th>Location</th><th>Type</th><th>Quantity</th><th>Unit</th><th>Value</th></tr></thead>
+    <tbody>
+    {% for s in stocks %}
+    <tr>
+        <td><a href="{{ url_for('main.item_detail', item_id=s.item.id) }}" class="fw-semibold text-decoration-none row-link">{{ s.item.name }}</a></td>
+        <td><code class="small">{{ s.item.sku }}</code></td>
+        <td>{{ s.location_name() }}</td>
+        <td><span class="badge {{ 'bg-info' if s.location_type == 'site' else 'bg-primary' }} bg-opacity-15 text-{{ 'info' if s.location_type == 'site' else 'primary' }}">{{ s.location_type.title() }}</span></td>
+        <td class="fw-semibold">{{ s.quantity | round(2) }}</td>
+        <td class="text-muted">{{ s.item.unit }}</td>
+        <td class="text-muted">₱{{ '{:,.2f}'.format(s.quantity|float * s.item.unit_cost|float) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="text-center text-muted py-4">No stock recorded.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+</div>
+{% endblock %}

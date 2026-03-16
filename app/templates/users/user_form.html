@@ -1,0 +1,67 @@
+{% extends 'layouts/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{{ title }}</h1>
+    <p><a href="{{ url_for('main.user_list') }}">← Back to Users</a></p>
+</div>
+<div class="row justify-content-center">
+<div class="col-md-6">
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="card mb-3">
+        <div class="card-header">Account Details</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.username.label.text }}</label>
+                    {{ form.username(class='form-control') }}
+                    {% for e in form.username.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.email.label.text }}</label>
+                    {{ form.email(class='form-control') }}
+                    {% for e in form.email.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="col-12">
+                    <label class="form-label">{{ form.full_name.label.text }}</label>
+                    {{ form.full_name(class='form-control') }}
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">{{ form.role.label.text }}</label>
+                    {{ form.role(class='form-select') }}
+                </div>
+                <div class="col-md-4 d-flex align-items-end pb-1">
+                    {{ form.is_active(class='form-check-input me-2') }} <label>Active</label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card mb-3">
+        <div class="card-header">Password {% if user is defined %}(leave blank to keep current){% endif %}</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.password.label.text }}</label>
+                    {{ form.password(class='form-control') }}
+                    {% for e in form.password.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.confirm_password.label.text }}</label>
+                    {{ form.confirm_password(class='form-control') }}
+                </div>
+            </div>
+            {% if user is not defined %}
+            <div class="text-muted small mt-2">Default password will be <code>password123</code> if left blank.</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        {{ form.submit(class='btn btn-primary px-4') }}
+        <a href="{{ url_for('main.user_list') }}" class="btn btn-outline-secondary px-4">Cancel</a>
+    </div>
+</form>
+</div>
+</div>
+{% endblock %}

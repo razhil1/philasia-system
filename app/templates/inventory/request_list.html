@@ -1,73 +1,57 @@
 {% extends 'layouts/base.html' %}
-
-{% block title %}Material Requests | PhilAsia Pro{% endblock %}
-
+{% block title %}Requisitions{% endblock %}
+{% block page_title %}Material Requisitions{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-end mb-4">
-    <div>
-        <h1 class="h3 fw-bold mb-1">Material Requests</h1>
-        <p class="text-muted mb-0">Project site requisitions pending fulfillment</p>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('main.request_create') }}" class="qb-primary-btn d-flex align-items-center gap-2 px-4 shadow-sm text-decoration-none" style="padding-top: 0.6rem; padding-bottom: 0.6rem;">
-            <i class="bi bi-file-earmark-plus"></i>
-            <span>New Requisition</span>
-        </a>
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div><h1>Material Requisitions</h1><p>Track supply requests from project sites.</p></div>
+    <a href="{{ url_for('main.request_create') }}" class="btn btn-primary"><i class="bi bi-clipboard2-plus me-1"></i>New Requisition</a>
+</div>
+
+<div class="card mb-3 p-3">
+    <div class="d-flex flex-wrap gap-2">
+        <span class="fw-semibold small text-muted me-1">Status:</span>
+        <a href="{{ url_for('main.request_list') }}" class="btn btn-sm {{ 'btn-dark' if not status_filter else 'btn-outline-secondary' }}">All</a>
+        {% for s in ['pending','approved','partial','fulfilled','rejected'] %}
+        <a href="{{ url_for('main.request_list', status=s) }}" class="btn btn-sm {{ 'btn-dark' if status_filter == s else 'btn-outline-secondary' }}">{{ s.title() }}</a>
+        {% endfor %}
     </div>
 </div>
 
-<div class="qb-card mb-4">
-    <div class="p-0">
-        <div class="table-responsive">
-            <table class="table qb-table align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th class="ps-4">Request Date</th>
-                        <th>Reference ID</th>
-                        <th>Project Site</th>
-                        <th>Status</th>
-                        <th>Requestor</th>
-                        <th class="text-end pe-4">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for req in requests %}
-                    <tr>
-                        <td class="ps-4">
-                            <div class="fw-bold small">{{ req.created_at.strftime('%d %b %Y') }}</div>
-                            <div class="extra-small text-muted">{{ req.created_at.strftime('%H:%M') }}</div>
-                        </td>
-                        <td><code class="extra-small text-primary fw-bold">#REQ-{{ 5000 + req.id }}</code></td>
-                        <td>
-                            <div class="fw-semibold small">{{ req.site.name }}</div>
-                        </td>
-                        <td>
-                            <span class="badge rounded-pill {% if req.status == 'pending' %}bg-warning-subtle text-warning border-warning{% elif req.status == 'approved' %}bg-info-subtle text-info border-info{% else %}bg-success-subtle text-success border-success{% endif %} border extra-small px-3">
-                                {{ req.status.upper() }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="small text-muted">{{ req.user.username }}</span>
-                        </td>
-                        <td class="text-end pe-4">
-                            <a href="{{ url_for('main.request_detail', request_id=req.id) }}" class="btn btn-sm qb-outline-btn py-1 px-3">
-                                View Details
-                            </a>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="6" class="text-center py-5">
-                            <div class="py-4">
-                                <i class="bi bi-file-earmark-text fs-1 opacity-10 mb-3 d-block"></i>
-                                <h6 class="text-muted">No material requests found.</h6>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div class="card">
+<div class="table-responsive">
+<table class="table mb-0">
+    <thead><tr><th>Ref</th><th>Site</th><th>Requested By</th><th>Priority</th><th>Date Needed</th><th>Status</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+    {% for r in reqs.items %}
+    <tr>
+        <td class="fw-semibold">REQ-{{ '%04d'|format(r.id) }}</td>
+        <td>{{ r.site.name }}</td>
+        <td>{{ r.requested_by.display_name }}</td>
+        <td><span class="badge pri-{{ r.priority }}">{{ r.priority.title() }}</span></td>
+        <td class="text-muted small">{{ r.date_needed.strftime('%b %d, %Y') if r.date_needed else '—' }}</td>
+        <td><span class="badge status-{{ r.status }}">{{ r.status.title() }}</span></td>
+        <td class="text-muted small">{{ r.created_at.strftime('%b %d, %Y') }}</td>
+        <td><a href="{{ url_for('main.request_detail', req_id=r.id) }}" class="btn btn-sm btn-outline-primary">View</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8" class="text-center text-muted py-4">No requisitions found.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% if reqs.pages > 1 %}
+<div class="card-footer d-flex justify-content-between align-items-center">
+    <span class="text-muted small">{{ reqs.total }} records</span>
+    <nav><ul class="pagination pagination-sm mb-0">
+        {% for p in reqs.iter_pages() %}
+            {% if p %}
+            <li class="page-item {{ 'active' if p == reqs.page }}">
+                <a class="page-link" href="{{ url_for('main.request_list', page=p, status=status_filter) }}">{{ p }}</a>
+            </li>
+            {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+        {% endfor %}
+    </ul></nav>
+</div>
+{% endif %}
 </div>
 {% endblock %}

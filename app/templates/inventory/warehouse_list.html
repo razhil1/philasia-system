@@ -1,69 +1,53 @@
 {% extends 'layouts/base.html' %}
-
-{% block title %}Facility Management | PhilAsia Pro{% endblock %}
-
+{% block title %}Warehouses{% endblock %}
+{% block page_title %}Warehouses{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-end mb-4">
-    <div>
-        <h1 class="h3 fw-bold mb-1">Facility Management</h1>
-        <p class="text-muted mb-0">Central storage and distribution centers</p>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('main.warehouse_create') }}" class="qb-primary-btn d-flex align-items-center gap-2 px-4 shadow-sm text-decoration-none" style="padding-top: 0.6rem; padding-bottom: 0.6rem;">
-            <i class="bi bi-building-add"></i>
-            <span>Add Warehouse</span>
-        </a>
-    </div>
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div><h1>Warehouses</h1><p>Central storage facilities and their inventory.</p></div>
+    {% if current_user.can('manage_warehouses') %}
+    <a href="{{ url_for('main.warehouse_create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Warehouse</a>
+    {% endif %}
 </div>
-
 <div class="row g-4">
-    {% for warehouse in warehouses %}
-    <div class="col-md-6 col-xl-4">
-        <div class="qb-card hover-lift h-100">
-            <div class="p-4">
-                <div class="d-flex justify-content-between align-items-start mb-3">
-                    <div class="bg-light p-3 rounded-4 d-flex align-items-center justify-content-center text-primary" style="width: 56px; height: 56px;">
-                        <i class="bi bi-building fs-3"></i>
-                    </div>
-                    <div class="dropdown">
-                        <button class="btn btn-link link-secondary p-0" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
-                        <ul class="dropdown-menu border-0 shadow-lg">
-                            <li><a class="dropdown-item py-2" href="#"><i class="bi bi-pencil me-2"></i>Edit Facility</a></li>
-                            <li><a class="dropdown-item py-2" href="#"><i class="bi bi-shield-check me-2"></i>Security Audit</a></li>
-                        </ul>
-                    </div>
-                </div>
-                <h5 class="fw-bold mb-1">{{ warehouse.name }}</h5>
-                <div class="text-muted extra-small mb-3 d-flex align-items-center gap-2">
-                    <i class="bi bi-geo-alt"></i>
-                    {{ warehouse.location }}
-                </div>
-                <div class="bg-light p-3 rounded-3 mb-3">
-                    <div class="extra-small text-muted mb-1 text-uppercase fw-bold">Contact Authority</div>
-                    <div class="small fw-semibold">{{ warehouse.contact_info or 'N/A' }}</div>
-                </div>
-                <div class="d-grid">
-                    <button class="btn qb-outline-btn d-flex align-items-center justify-content-center gap-2">
-                        <i class="bi bi-eye"></i>
-                        <span>Audit Current Inventory</span>
-                    </button>
+{% for d in wh_data %}
+<div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+        <div class="card-body">
+            <div class="d-flex align-items-start gap-3 mb-3">
+                <div class="stat-icon bg-primary bg-opacity-10 text-primary" style="width:46px;height:46px;border-radius:12px;"><i class="bi bi-building fs-5"></i></div>
+                <div>
+                    <h5 class="fw-bold mb-0">{{ d.wh.name }}</h5>
+                    <div class="text-muted small"><i class="bi bi-geo-alt me-1"></i>{{ d.wh.location }}</div>
                 </div>
             </div>
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="form-section py-2 px-3">
+                        <div class="form-section-title mb-0">Items Stored</div>
+                        <div class="fw-bold fs-5">{{ d.items_count }}</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="form-section py-2 px-3">
+                        <div class="form-section-title mb-0">Est. Value</div>
+                        <div class="fw-bold fs-5">₱{{ '{:,.0f}'.format(d.total_value) }}</div>
+                    </div>
+                </div>
+            </div>
+            {% if d.wh.contact_person %}
+            <div class="text-muted small mb-3"><i class="bi bi-person me-1"></i>{{ d.wh.contact_person }}</div>
+            {% endif %}
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <a href="{{ url_for('main.warehouse_detail', wh_id=d.wh.id) }}" class="btn btn-sm btn-outline-primary flex-fill">View Stock</a>
+            {% if current_user.can('manage_warehouses') %}
+            <a href="{{ url_for('main.warehouse_edit', wh_id=d.wh.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+            {% endif %}
         </div>
     </div>
-    {% else %}
-    <div class="col-12 text-center py-5">
-        <div class="display-1 text-muted opacity-10 mb-3"><i class="bi bi-buildings"></i></div>
-        <h5 class="fw-bold">No facilities registered</h5>
-        <a href="{{ url_for('main.warehouse_create') }}" class="qb-primary-btn mt-3 text-decoration-none">Register New Warehouse</a>
-    </div>
-    {% endfor %}
 </div>
-
-<style>
-    .hover-lift:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-    }
-</style>
+{% else %}
+<div class="col-12 text-center text-muted py-5">No warehouses yet. <a href="{{ url_for('main.warehouse_create') }}">Create one.</a></div>
+{% endfor %}
+</div>
 {% endblock %}

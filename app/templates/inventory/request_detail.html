@@ -1,110 +1,139 @@
 {% extends 'layouts/base.html' %}
-
-{% block title %}Requisition #REQ-{{ 5000 + request.id }} | PhilAsia Pro{% endblock %}
-
+{% block title %}REQ-{{ '%04d'|format(req.id) }}{% endblock %}
+{% block page_title %}Requisition Detail{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-end mb-4">
+<div class="page-header d-flex justify-content-between align-items-end">
     <div>
-        <div class="extra-small fw-bold text-muted text-uppercase mb-1">Material Requisition ID</div>
-        <h1 class="h3 fw-bold mb-1">#REQ-{{ 5000 + request.id }}</h1>
-        <p class="text-muted mb-0">For Project: <span class="text-dark fw-bold">{{ request.site.name }}</span></p>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h1 class="mb-0">REQ-{{ '%04d'|format(req.id) }}</h1>
+            <span class="badge status-{{ req.status }} fs-6">{{ req.status.title() }}</span>
+            <span class="badge pri-{{ req.priority }}">{{ req.priority.title() }}</span>
+        </div>
+        <p>{{ req.site.name }} · Requested by {{ req.requested_by.display_name }} · {{ req.created_at.strftime('%b %d, %Y') }}</p>
     </div>
     <div class="d-flex gap-2">
-        <button class="qb-outline-btn"><i class="bi bi-printer me-2"></i>Print PO</button>
-        <button class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" style="background-color: var(--qb-green); border: none;">Fulfill Request</button>
+        {% if req.status == 'pending' %}
+            {% if current_user.can('approve_requests') %}
+            <form method="POST" action="{{ url_for('main.request_approve', req_id=req.id) }}" class="d-inline">
+                {{ approve_form.hidden_tag() }}
+                <button class="btn btn-success btn-sm" onclick="return confirm('Approve this requisition?')">
+                    <i class="bi bi-check-lg me-1"></i>Approve
+                </button>
+            </form>
+            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                <i class="bi bi-x-lg me-1"></i>Reject
+            </button>
+            {% endif %}
+        {% endif %}
+        {% if req.status in ('approved', 'partial') and current_user.can('manage_movements') %}
+        <form method="POST" action="{{ url_for('main.request_fulfill', req_id=req.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-primary btn-sm" onclick="return confirm('Fulfill this requisition from available warehouse stock?')">
+                <i class="bi bi-truck me-1"></i>Fulfill
+            </button>
+        </form>
+        {% endif %}
     </div>
 </div>
 
+{% if req.rejection_reason %}
+<div class="alert alert-danger"><strong>Rejected:</strong> {{ req.rejection_reason }}</div>
+{% endif %}
+{% if req.notes %}
+<div class="alert alert-secondary"><i class="bi bi-chat-left-text me-2"></i>{{ req.notes }}</div>
+{% endif %}
+
 <div class="row g-4">
     <div class="col-lg-8">
-        <!-- Items List -->
-        <div class="qb-card mb-4">
-            <div class="qb-card-header bg-light">
-                <h6 class="fw-bold mb-0">Requested Resources</h6>
-            </div>
-            <div class="p-0">
-                <div class="table-responsive">
-                    <table class="table qb-table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th class="ps-4">Item Specification</th>
-                                <th class="text-center">Requested Volume</th>
-                                <th class="text-end pe-4">Stock Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in request.items %}
-                            <tr>
-                                <td class="ps-4">
-                                    <div class="fw-bold small">{{ item.item.name }}</div>
-                                    <div class="extra-small text-muted">SKU: {{ item.item.sku }}</div>
-                                </td>
-                                <td class="text-center fw-bold">{{ item.quantity|int }} {{ item.item.unit }}</td>
-                                <td class="text-end pe-4">
-                                    <span class="badge bg-light text-success border px-2 extra-small">In Stock</span>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="3" class="text-center py-5 text-muted small">No items added to this requisition yet.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+        <!-- Items Table -->
+        <div class="card mb-4">
+            <div class="card-header">Requested Items</div>
+            <div class="table-responsive">
+            <table class="table mb-0">
+                <thead><tr><th>Item</th><th>SKU</th><th>Unit</th><th>Requested</th><th>Delivered</th><th>Status</th></tr></thead>
+                <tbody>
+                {% for ri in req.items %}
+                <tr>
+                    <td class="fw-semibold">{{ ri.item.name }}</td>
+                    <td><code class="small">{{ ri.item.sku }}</code></td>
+                    <td class="text-muted">{{ ri.item.unit }}</td>
+                    <td>{{ ri.quantity_requested }}</td>
+                    <td class="{{ 'text-success fw-bold' if ri.is_fulfilled else 'text-warning fw-bold' }}">{{ ri.quantity_delivered }}</td>
+                    <td>
+                        {% if ri.is_fulfilled %}<span class="badge bg-success">Fulfilled</span>
+                        {% elif ri.quantity_delivered|float > 0 %}<span class="badge bg-warning text-dark">Partial</span>
+                        {% else %}<span class="badge bg-secondary">Pending</span>{% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-3">No items added yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
             </div>
         </div>
 
-        <!-- Add Items Form -->
-        {% if request.status == 'pending' %}
-        <div class="qb-card p-4 bg-light bg-opacity-50">
-            <h6 class="fw-bold small text-uppercase mb-3">Add Resource to Requisition</h6>
-            <form method="POST" class="row g-3">
-                {{ form.hidden_tag() }}
-                <div class="col-md-7">
-                    {{ form.item_id(class="form-select") }}
-                </div>
-                <div class="col-md-3">
-                    {{ form.quantity(class="form-control", placeholder="Qty") }}
-                </div>
-                <div class="col-md-2">
-                    {{ form.submit(class="btn btn-primary w-100 fw-bold") }}
+        <!-- Add Item (pending only) -->
+        {% if req.status == 'pending' %}
+        <div class="card">
+            <div class="card-header">Add Item to Requisition</div>
+            <div class="card-body">
+            <form method="POST">
+                {{ item_form.hidden_tag() }}
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">{{ item_form.item_id.label.text }}</label>
+                        {{ item_form.item_id(class='form-select') }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ item_form.quantity_requested.label.text }}</label>
+                        {{ item_form.quantity_requested(class='form-control') }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ item_form.notes.label.text }}</label>
+                        {{ item_form.notes(class='form-control') }}
+                    </div>
+                    <div class="col-12">{{ item_form.submit(class='btn btn-outline-primary btn-sm') }}</div>
                 </div>
             </form>
+            </div>
         </div>
         {% endif %}
     </div>
 
     <div class="col-lg-4">
-        <!-- Requisition Metadata -->
-        <div class="qb-card p-4 mb-4">
-            <label class="extra-small fw-bold text-muted text-uppercase mb-3 d-block">Request Status</label>
-            <div class="d-flex align-items-center gap-3 mb-4">
-                <div class="rounded-circle bg-warning p-2"></div>
-                <div>
-                    <div class="fw-bold">{{ request.status.capitalize() }}</div>
-                    <div class="extra-small text-muted">Initiated by {{ request.user.username }}</div>
+        <div class="card">
+            <div class="card-header">Requisition Info</div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-6"><div class="detail-label">Site</div><div class="detail-val">{{ req.site.name }}</div></div>
+                    <div class="col-6"><div class="detail-label">Priority</div><span class="badge pri-{{ req.priority }}">{{ req.priority.title() }}</span></div>
+                    <div class="col-6"><div class="detail-label">Submitted</div><div class="detail-val small">{{ req.created_at.strftime('%b %d, %Y') }}</div></div>
+                    <div class="col-6"><div class="detail-label">Date Needed</div><div class="detail-val small">{{ req.date_needed.strftime('%b %d, %Y') if req.date_needed else '—' }}</div></div>
+                    {% if req.approved_by %}<div class="col-12"><div class="detail-label">Approved By</div><div class="detail-val">{{ req.approved_by.display_name }}</div></div>{% endif %}
+                    {% if req.approved_at %}<div class="col-12"><div class="detail-label">Approved At</div><div class="detail-val small">{{ req.approved_at.strftime('%b %d, %Y %H:%M') }}</div></div>{% endif %}
                 </div>
-            </div>
-            
-            <label class="extra-small fw-bold text-muted text-uppercase mb-2 d-block">Timeline</label>
-            <div class="ps-2 border-start py-1 ms-1">
-                <div class="extra-small mb-3">
-                    <div class="fw-bold">Created</div>
-                    <div class="text-muted">{{ request.created_at.strftime('%b %d, %Y - %H:%M') }}</div>
-                </div>
-                {% if request.status != 'pending' %}
-                <div class="extra-small text-muted">
-                    <div class="fw-bold">Processed</div>
-                    <div>Awaiting fulfillment logic...</div>
-                </div>
-                {% endif %}
             </div>
         </div>
+    </div>
+</div>
 
-        <div class="qb-card p-4">
-            <label class="extra-small fw-bold text-muted text-uppercase mb-2 d-block">Reason / Strategy</label>
-            <p class="small text-dark mb-0 italic" style="font-style: italic;">"{{ request.notes or 'No strategic notes provided.' }}"</p>
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Reject Requisition</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <form method="POST" action="{{ url_for('main.request_reject', req_id=req.id) }}">
+                {{ reject_form.hidden_tag() }}
+                <div class="modal-body">
+                    <label class="form-label">{{ reject_form.rejection_reason.label.text }}</label>
+                    {{ reject_form.rejection_reason(class='form-control', rows=3) }}
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    {{ reject_form.submit(class='btn btn-danger btn-sm') }}
+                </div>
+            </form>
         </div>
     </div>
 </div>

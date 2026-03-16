@@ -1,93 +1,69 @@
 {% extends 'layouts/base.html' %}
-
-{% block title %}Audit Trail | PhilAsia Pro{% endblock %}
-
+{% block title %}Movements{% endblock %}
+{% block page_title %}Movement Ledger{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-end mb-4">
-    <div>
-        <h1 class="h3 fw-bold mb-1">Stock Ledger (Audit Trail)</h1>
-        <p class="text-muted mb-0">Immutable record of all resource movements and adjustments</p>
-    </div>
-    <div class="d-flex gap-2">
-        <button class="qb-outline-btn d-flex align-items-center gap-2">
-            <i class="bi bi-filter"></i>
-            <span>Export Trail</span>
-        </button>
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div><h1>Movement Ledger</h1><p>Complete audit trail of all inventory transactions.</p></div>
+    {% if current_user.can('manage_movements') %}
+    <a href="{{ url_for('main.movement_create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Post Transaction</a>
+    {% endif %}
+</div>
+
+<!-- Filter bar -->
+<div class="card mb-3 p-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="fw-semibold small text-muted">Filter by type:</span>
+        <a href="{{ url_for('main.movement_list') }}" class="btn btn-sm {{ 'btn-dark' if not mtype else 'btn-outline-secondary' }}">All</a>
+        {% for k, v in movement_types.items() %}
+        <a href="{{ url_for('main.movement_list', type=k) }}" class="btn btn-sm {{ 'btn-dark' if mtype == k else 'btn-outline-secondary' }}">{{ v }}</a>
+        {% endfor %}
     </div>
 </div>
 
-<div class="qb-card mb-4">
-    <div class="qb-card-header bg-light bg-opacity-50">
-        <div class="d-flex gap-3 w-100 align-items-center">
-            <div class="search-container flex-grow-1" style="width: auto;">
-                <i class="bi bi-search"></i>
-                <input type="text" class="search-input" placeholder="Search by batch ID, SKU, or user...">
-            </div>
-            <select class="form-select form-select-sm w-auto border-secondary-subtle">
-                <option selected>All Transactions</option>
-                <option>Deliveries</option>
-                <option>Transfers</option>
-                <option>Adjustments</option>
-            </select>
-            <div class="vr mx-2"></div>
-            <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-printer"></i></button>
-        </div>
+<div class="card">
+    <div class="table-responsive">
+    <table class="table mb-0">
+        <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>From</th><th>To</th><th>Ref</th><th>By</th><th></th></tr></thead>
+        <tbody>
+        {% for m in movements.items %}
+        <tr>
+            <td class="text-muted small">{{ m.id }}</td>
+            <td class="text-muted small">{{ m.date.strftime('%b %d, %Y %H:%M') }}</td>
+            <td><span class="badge move-{{ m.movement_type }}">{{ m.type_label }}</span></td>
+            <td>
+                <a href="{{ url_for('main.item_detail', item_id=m.item.id) }}" class="fw-semibold text-decoration-none row-link">{{ m.item.name }}</a>
+                <br><small class="text-muted">{{ m.item.sku }}</small>
+            </td>
+            <td class="fw-semibold">{{ m.quantity }} <span class="text-muted small">{{ m.item.unit }}</span></td>
+            <td class="text-muted small">{{ m.from_location_name() }}</td>
+            <td class="text-muted small">{{ m.to_location_name() }}</td>
+            <td class="text-muted small">{{ m.reference or '—' }}</td>
+            <td class="text-muted small">{{ m.created_by.username }}</td>
+            <td><a href="{{ url_for('main.movement_detail', mov_id=m.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="text-center text-muted py-4">No movements recorded.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
     </div>
-    <div class="p-0">
-        <div class="table-responsive">
-            <table class="table qb-table align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th class="ps-4">Ledger Date</th>
-                        <th>Transaction ID</th>
-                        <th>Resource Allocation</th>
-                        <th>Change Source / Target</th>
-                        <th class="text-center">Authorized By</th>
-                        <th class="text-end pe-4">Volume</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for movement in movements %}
-                    <tr>
-                        <td class="ps-4">
-                            <div class="fw-bold small">{{ movement.date.strftime('%d %b %Y') }}</div>
-                            <div class="extra-small text-muted">{{ movement.date.strftime('%H:%M:%S') }}</div>
-                        </td>
-                        <td><code class="extra-small text-primary fw-bold">#{{ 1000 + movement.id }}</code></td>
-                        <td>
-                            <div class="fw-semibold small text-dark">{{ movement.item.name }}</div>
-                            <div class="extra-small text-muted">SKU: {{ movement.item.sku }}</div>
-                        </td>
-                        <td>
-                            <div class="small">
-                                <span class="text-muted">From:</span> {{ movement.from_warehouse.name if movement.from_warehouse_id else (movement.from_site.name if movement.from_site_id else 'External/Vendor') }}
-                            </div>
-                            <div class="small">
-                                <span class="text-muted">To:</span> {{ movement.to_warehouse.name if movement.to_warehouse_id else (movement.to_site.name if movement.to_site_id else 'Adjustment') }}
-                            </div>
-                        </td>
-                        <td class="text-center">
-                            <span class="badge bg-light text-dark border extra-small px-3">{{ movement.user.username }}</span>
-                        </td>
-                        <td class="text-end pe-4">
-                            <div class="fw-bold {% if movement.movement_type == 'delivery' %}text-success{% else %}text-danger{% endif %}">
-                                {{ '+' if movement.movement_type == 'delivery' else '-' }}{{ movement.quantity|int }}
-                            </div>
-                        </td>
-                    </tr>
+    {% if movements.pages > 1 %}
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <span class="text-muted small">{{ movements.total }} records</span>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                {% for p in movements.iter_pages() %}
+                    {% if p %}
+                    <li class="page-item {{ 'active' if p == movements.page }}">
+                        <a class="page-link" href="{{ url_for('main.movement_list', page=p, type=mtype) }}">{{ p }}</a>
+                    </li>
                     {% else %}
-                    <tr>
-                        <td colspan="6" class="text-center py-5 text-muted">
-                            <div class="py-4">
-                                <i class="bi bi-journal-x fs-1 opacity-25 mb-3 d-block"></i>
-                                <h6>No transactions found for the selected period.</h6>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </nav>
     </div>
+    {% endif %}
 </div>
 {% endblock %}

@@ -1,0 +1,393 @@
+Inventory Management System
+
+A movement-based inventory management system for companies managing warehouses and project sites. Built with React 19 (Vite 7), Express, Drizzle ORM, and PostgreSQL (Neon serverless).
+Table of Contents
+
+    Overview
+    Architecture
+    Environment Setup
+        Development Environment
+        Production Environment
+    Database Setup (Neon)
+    Environment Variables
+    Setup
+    Development
+    Folder Structure
+    Database Migrations
+    Deployment Flow
+    Safety Guidelines
+
+Overview
+
+This system uses a movement-based inventory approach where stock quantities are calculated from transaction history rather than direct updates. This ensures complete audit trail integrity and prevents data discrepancies.
+Core Features
+
+    Inventory Management: Track stock in warehouses and project sites with product images
+    Movement Tracking: Audit trail of all transactions (Deliveries, Transfers, Pullouts, Adjustments, Returns, Consumption, Scrapping)
+    Project Site Management: Track inventory and progress at different locations with billing integration
+    LPG Module: Manage LPG cylinders, customers, exchanges, deliveries, and refill requests
+    Trading/Cooker Module: Chemical products, raw materials, batch tracking, and production reports
+    User Management: Role-based access control (8 roles) with TOTP two-factor authentication
+    Real-time Updates: WebSocket support for live data synchronization
+
+User Roles
+Role	Description
+Admin	Full system access
+Project Manager	Project and site management
+Cooker	Chemical production and reports
+Delivery Guy	Delivery operations
+Accounting	Financial operations
+Finance Manager	Budget and financial oversight
+Stock Clerk	Inventory operations
+Viewer	Read-only access
+Architecture
+Final Architecture (Simple + Safe)
+Environment	Purpose	Database	Access
+Development	Test, break, debug new features	inventory_dev (Neon)	Developer only
+Production	Stable for real users	inventory_prod (Neon)	Real users only
+
+Key Benefits:
+
+    NO real data lost even if Development breaks
+    Separate databases prevent cross-contamination
+    Safe experimentation in Development
+
+Environment Setup
+Development Environment
+
+The development environment runs in your original Replit workspace.
+
+Purpose:
+
+    Build new UI features
+    Test API endpoints
+    Test database migrations
+    Debug and experiment safely
+    Accessible only by developers
+
+Production Environment
+
+The production environment runs in a separate Replit workspace (remixed account).
+
+Purpose:
+
+    Always stable
+    Real users access only this version
+    No experiments allowed
+    Uses production database
+
+Database Setup (Neon)
+Step 1: Create Development Database
+
+    Log in to Neon Console
+    Create a new database named: inventory_dev
+    Copy the connection URL
+
+Step 2: Create Production Database
+
+    In Neon Console, create another database named: inventory_prod
+    Copy the connection URL
+
+Each database has its own:
+
+    Host
+    Username
+    Password
+    Connection URL
+
+Environment Variables
+Development Replit (Main Account)
+
+Go to Tools → Secrets and add:
+
+DATABASE_URL=postgres://your-dev-connection-url
+SESSION_SECRET=something-random-dev
+ENVIRONMENT=development
+
+Production Replit (Remixed Account)
+
+Go to Tools → Secrets and add:
+
+DATABASE_URL=postgres://your-prod-connection-url
+SESSION_SECRET=something-random-prod
+ENVIRONMENT=production
+
+Required Environment Variables
+Variable	Description	Example
+DATABASE_URL	PostgreSQL connection string	postgres://user:pass@host:5432/db
+SESSION_SECRET	Random string for session encryption	dev-secret-123
+ENVIRONMENT	Current environment	development or production
+Alternative PostgreSQL Variables
+
+If DATABASE_URL is not set, the system will construct it from:
+
+    PGHOST - Database host
+    PGUSER - Database username
+    PGPASSWORD - Database password
+    PGDATABASE - Database name
+    PGPORT - Port (defaults to 5432)
+
+Setup
+Prerequisites
+
+    Node.js 18 or higher
+    PostgreSQL database (Neon recommended)
+    Replit account (optional, for deployment)
+
+Installation Steps
+
+    Clone or Fork the Repository
+
+    git clone <repository-url>
+    cd inventory-management-system
+
+    Install Dependencies
+
+    npm install
+
+    Configure Environment Variables
+
+    In Replit:
+        Go to Tools → Secrets
+        Add the required environment variables listed above
+
+    For local development:
+        Create a .env file in the root directory
+        Add your environment variables:
+
+    DATABASE_URL=postgres://username:password@host:5432/database
+    SESSION_SECRET=your-secret-key-min-32-chars
+    ENVIRONMENT=development
+    PORT=5000
+
+    Initialize Database
+
+    npm run db:push
+
+    This will:
+        Connect to your PostgreSQL database
+        Create all necessary tables
+        Set up the schema based on shared/schema.ts
+
+    Verify Setup
+
+    npm run dev
+
+        Server should start on port 5000
+        Default admin user will be created:
+            Username: admin
+            Password: admin123
+        Access the application at http://0.0.0.0:5000
+
+First Login
+
+    Navigate to the login page
+    Use the default admin credentials:
+        Username: admin
+        Password: admin123
+    Important: Change the admin password immediately after first login
+    Set up TOTP (Two-Factor Authentication) for enhanced security
+
+Development
+Starting the Development Server
+
+npm run dev
+
+This will:
+
+    Run database migrations automatically
+    Start the Express backend server on port 5000
+    Start the Vite development server with HMR (Hot Module Replacement)
+    Enable live reload for both frontend and backend changes
+
+Development Workflow
+
+    Backend Development
+        Server code is in server/ directory
+        Routes are defined in server/routes.ts
+        Database queries in server/storage.ts
+        Changes trigger automatic server restart
+
+    Frontend Development
+        React components are in client/src/ directory
+        Pages are in client/src/pages/
+        Reusable components in client/src/components/
+        Hot Module Replacement provides instant updates
+
+    Database Schema Changes
+        Edit shared/schema.ts to modify database structure
+        Run npm run db:push to apply changes
+        Test thoroughly in development before production
+
+Available Scripts
+Command	Description
+npm run dev	Start development server with auto-reload
+npm run build	Build for production
+npm run start	Start production server
+npm run check	Run TypeScript type checking
+npm run db:push	Push database schema changes
+API Development
+
+The API follows RESTful conventions:
+
+Base URL: http://0.0.0.0:5000/api
+
+Authentication: Session-based with cookies
+
+Common Endpoints:
+
+    GET /api/inventory - Get all inventory items
+    POST /api/movements - Create new movement
+    GET /api/products - List all products
+    GET /api/locations - List all locations
+    GET /api/projects - List all projects
+    GET /api/lpg/cylinders - List LPG cylinders
+    GET /api/trading/products - List chemical products
+
+Folder Structure
+
+root/
+├── client/                    # Frontend React application
+│   ├── public/               # Static assets (favicon, robots.txt, sitemap)
+│   └── src/
+│       ├── components/       # Reusable UI components
+│       │   └── ui/          # shadcn/ui components
+│       ├── hooks/            # Custom React hooks
+│       ├── lib/              # Utilities and helpers
+│       └── pages/            # Page components
+│           ├── cooker/       # Cooker module pages
+│           ├── lpg/          # LPG module pages
+│           └── trading/      # Trading module pages
+├── server/                    # Backend Express application
+│   ├── domain/               # Domain logic and errors
+│   ├── db.ts                 # Database connection
+│   ├── env.ts                # Environment variable setup
+│   ├── events.ts             # Event handling
+│   ├── index.ts              # Server entry point
+│   ├── routes.ts             # API routes
+│   ├── storage.ts            # Database operations
+│   ├── vite.ts               # Vite integration
+│   └── websocket.ts          # WebSocket server
+├── shared/                    # Shared types and schemas
+│   └── schema.ts             # Drizzle schema definitions
+├── migrations/               # Database migrations
+├── uploads/                  # Uploaded files (product images)
+├── drizzle.config.ts         # Drizzle Kit configuration
+├── package.json              # Dependencies
+└── README.md                 # This file
+
+Database Migrations
+Safe Migration Flow
+
+Follow this process to safely apply migrations:
+Step 1: Run Migrations on Development First
+
+npm run db:push
+
+This applies migrations to your development database.
+Step 2: Test in Development
+
+Before migrating production, verify:
+
+    Does the API still work?
+    Does the frontend break?
+    Is data correct?
+    Are all CRUD operations functional?
+
+Step 3: Apply to Production (When Ready)
+
+DATABASE_URL=<prod_url_here> npm run db:push
+
+Drizzle Commands
+Command	Description
+npm run db:push	Push schema changes to database
+Deployment Flow
+Zero-Risk Deployment Process
+A. Develop in Original Replit
+
+    Build new UI features
+    Test API endpoints
+    Test database changes
+    No risk - using inventory_dev
+
+B. Copy Code to Production Replit
+
+When ready for deployment:
+
+    Use GitHub to sync code, OR
+    Copy files directly to production workspace
+
+C. Launch Production
+
+    Production Replit uses Production Database
+    Only real users access this version
+    Never uses development data
+    Never breaks when Development breaks
+
+Safety Guidelines
+DO's
+
+    Use separate databases for Development and Production
+    Always test migrations in Development first
+    Use different SESSION_SECRET for each environment
+    Copy code to Production only when thoroughly tested
+    Test API endpoints before migrating
+
+DON'Ts
+Action	Risk
+Use same Neon DB for Dev and Prod	Data corruption
+Test migrations directly in Production	Data loss
+Edit Production env while experimenting	Downtime
+Run seed scripts in Production	Data corruption
+Session Secret Best Practices
+
+To avoid cookie conflicts between environments:
+
+Development:
+
+SESSION_SECRET=dev-secret-123
+
+Production:
+
+SESSION_SECRET=prod-secret-999
+
+Tech Stack
+Layer	Technology
+Frontend	React 19, Vite 7, TypeScript
+UI Components	shadcn/ui, Radix UI, Tailwind CSS 4
+State Management	TanStack Query (React Query)
+Routing	Wouter
+Backend	Express.js, TypeScript
+ORM	Drizzle ORM
+Database	PostgreSQL (Neon Serverless)
+Session	connect-pg-simple
+Validation	Zod
+Real-time	WebSocket (ws)
+Quick Start
+1. Install Dependencies
+
+npm install
+
+2. Set Environment Variables
+
+Add to Replit Secrets:
+
+    DATABASE_URL
+    SESSION_SECRET
+    ENVIRONMENT
+
+3. Push Database Schema
+
+npm run db:push
+
+4. Start Development Server
+
+npm run dev
+
+The application will be available at http://0.0.0.0:5000
+Summary
+Environment	Features	Database	Access
+Development	New features, bugs, experiments	Neon Dev DB	Developers only
+Production	Stable, no experiments	Neon Prod DB	Real users only
+
+This setup mirrors how professional companies manage their applications - keeping development experiments completely separate from production stability.

@@ -8,6 +8,8 @@ import os
 db = SQLAlchemy()
 login = LoginManager()
 login.login_view = 'auth.login'
+login.login_message = 'Please sign in to access this page.'
+login.login_message_category = 'warning'
 csrf = CSRFProtect()
 
 def create_app(config_class=Config):
@@ -18,8 +20,10 @@ def create_app(config_class=Config):
     login.init_app(app)
     csrf.init_app(app)
 
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
+    upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static/uploads'))
+    if not os.path.exists(upload_folder):
+        os.makedirs(upload_folder)
+    app.config['UPLOAD_FOLDER'] = upload_folder
 
     from app.routes import main as main_blueprint
     app.register_blueprint(main_blueprint)
