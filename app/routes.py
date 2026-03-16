@@ -79,7 +79,7 @@ def dashboard():
         d = date.today() - timedelta(days=i)
         chart_labels.append(d.strftime('%b %d'))
         inflow_types = ['delivery', 'return', 'pullout']
-        outflow_types = ['transfer', 'consumption', 'scrap', 'adjustment']
+        outflow_types = ['transfer', 'site_transfer', 'consumption', 'scrap', 'adjustment']
         inflow = db.session.query(func.sum(Movement.quantity)).filter(
             func.date(Movement.date) == d,
             Movement.movement_type.in_(inflow_types)).scalar() or 0
@@ -356,12 +356,13 @@ def asset_unit_move(item_id):
 
         # Determine new status
         status_map = {
-            'transfer': 'deployed',
-            'pullout': 'available',
-            'delivery': 'available',
+            'delivery': 'available',      # Input: External → Warehouse
+            'transfer': 'deployed',       # Delivery: Warehouse → Site
+            'site_transfer': 'deployed',  # Transfer: Site → Site (still deployed)
+            'pullout': 'available',       # Pullout: Site → Warehouse
             'maintenance': 'maintenance',
             'scrap': 'scrapped',
-            'adjustment': None,  # keep current
+            'adjustment': None,           # keep current
         }
         new_status = status_map.get(mtype)
 

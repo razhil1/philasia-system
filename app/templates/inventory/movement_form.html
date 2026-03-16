@@ -111,7 +111,7 @@
     <!-- Consumption notice -->
     <div id="consumptionNote" class="alert d-none mb-3" style="background:#fff1f2;border:1px solid #fda4af;">
         <i class="bi bi-fire me-2 text-danger"></i>
-        <strong>Consumption:</strong> This records materials that have been <em>fully used up</em> at the project site
+        <strong>Consumption:</strong> Records materials that have been <em>fully used up</em> at the project site
         and cannot be returned. The quantity will be permanently deducted from site stock.
     </div>
 
@@ -120,6 +120,13 @@
         <i class="bi bi-box-arrow-left me-2 text-success"></i>
         <strong>Pullout:</strong> Returns unused/surplus materials from the project site back to the warehouse.
         Use this when materials are leftover and can be reused on other projects.
+    </div>
+
+    <!-- Site Transfer notice -->
+    <div id="siteTransferNote" class="alert d-none mb-3" style="background:#fffbeb;border:1px solid #fcd34d;">
+        <i class="bi bi-arrow-left-right me-2 text-warning"></i>
+        <strong>Transfer (Site to Site):</strong> Moves materials directly from one project site to another
+        without returning them to the warehouse first.
     </div>
 
     <div class="d-flex gap-2">
@@ -159,25 +166,28 @@ document.getElementById('itemSel').addEventListener('change', function() {
 
 // Pre-set from/to based on movement type + show contextual notes
 const typePresets = {
-    delivery:    { from: 'external', to: 'warehouse',
-                   desc: 'Incoming stock from vendor delivered to warehouse.' },
-    transfer:    { from: 'warehouse', to: 'site',
-                   desc: 'Move materials from warehouse to project site.' },
-    pullout:     { from: 'site', to: 'warehouse',
-                   desc: 'Return unused/surplus materials from site back to warehouse.' },
-    return:      { from: 'warehouse', to: 'external',
-                   desc: 'Return defective or excess stock to the vendor.' },
-    consumption: { from: 'site', to: 'none',
-                   desc: 'Materials fully used up at site — cannot be pulled out.' },
-    scrap:       { from: 'warehouse', to: 'none',
-                   desc: 'Write off damaged or expired materials.' },
-    adjustment:  { from: 'none', to: 'none',
-                   desc: 'Inventory correction (audit variance, loss, etc.).' },
+    delivery:       { from: 'external', to: 'warehouse',
+                      desc: 'Input: Stock received from external vendor, recorded into the warehouse.' },
+    transfer:       { from: 'warehouse', to: 'site',
+                      desc: 'Delivery: Move materials from warehouse to project site.' },
+    site_transfer:  { from: 'site', to: 'site',
+                      desc: 'Transfer: Move materials directly from one project site to another.' },
+    pullout:        { from: 'site', to: 'warehouse',
+                      desc: 'Pullout: Return unused/surplus materials from project site back to warehouse.' },
+    return:         { from: 'warehouse', to: 'external',
+                      desc: 'Return defective or excess stock to the vendor.' },
+    consumption:    { from: 'site', to: 'none',
+                      desc: 'Consumption: Materials fully used up at the project site — cannot be pulled out.' },
+    scrap:          { from: 'warehouse', to: 'none',
+                      desc: 'Write off damaged or expired materials.' },
+    adjustment:     { from: 'none', to: 'none',
+                      desc: 'Inventory correction (audit variance, loss, etc.).' },
 };
 
 const mtypeDescEl = document.getElementById('mtypeDesc');
 const consumptionNote = document.getElementById('consumptionNote');
 const pulloutNote = document.getElementById('pulloutNote');
+const siteTransferNote = document.getElementById('siteTransferNote');
 
 function applyPreset(val) {
     const p = typePresets[val];
@@ -189,6 +199,7 @@ function applyPreset(val) {
     mtypeDescEl.textContent = p.desc;
     consumptionNote.classList.toggle('d-none', val !== 'consumption');
     pulloutNote.classList.toggle('d-none', val !== 'pullout');
+    siteTransferNote.classList.toggle('d-none', val !== 'site_transfer');
 }
 
 document.getElementById('mtype').addEventListener('change', function() { applyPreset(this.value); });

@@ -79,9 +79,10 @@ class AssetUnitForm(FlaskForm):
 
 class AssetMovementForm(FlaskForm):
     movement_type = SelectField('Movement Type', choices=[
-        ('transfer', 'Transfer to Site'),
-        ('pullout', 'Pullout — Return to Warehouse'),
-        ('delivery', 'New Delivery / Received'),
+        ('delivery', 'Input — New Receipt (External → Warehouse)'),
+        ('transfer', 'Delivery — Deploy to Site (Warehouse → Site)'),
+        ('site_transfer', 'Transfer — Site to Site'),
+        ('pullout', 'Pullout — Return to Warehouse (Site → Warehouse)'),
         ('maintenance', 'Send to Maintenance'),
         ('scrap', 'Scrap / Dispose'),
         ('adjustment', 'Adjustment'),
@@ -137,9 +138,10 @@ class ProjectSiteForm(FlaskForm):
 
 
 CONSUMABLE_MOVEMENT_TYPES = {
-    'delivery': 'Delivery (Inflow from Vendor)',
-    'transfer': 'Transfer (Warehouse → Site)',
-    'pullout': 'Pullout (Return from Site to Warehouse)',
+    'delivery': 'Input (from External / Vendor)',
+    'transfer': 'Delivery (Warehouse to Project Site)',
+    'site_transfer': 'Transfer (Project Site to Project Site)',
+    'pullout': 'Pullout (Project Site to Warehouse)',
     'consumption': 'Consumption (Used up at Site)',
     'adjustment': 'Adjustment',
     'return': 'Return to Vendor',

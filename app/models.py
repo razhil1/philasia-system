@@ -15,18 +15,20 @@ ROLES = {
 }
 
 MOVEMENT_TYPES = {
-    'delivery': 'Delivery (Inflow)',
-    'transfer': 'Transfer',
-    'pullout': 'Pullout (Return from Site)',
+    'delivery': 'Input (from External / Vendor)',
+    'transfer': 'Delivery (Warehouse to Project Site)',
+    'site_transfer': 'Transfer (Project Site to Project Site)',
+    'pullout': 'Pullout (Project Site to Warehouse)',
     'adjustment': 'Adjustment',
     'return': 'Return to Vendor',
-    'consumption': 'Consumption',
+    'consumption': 'Consumption (Used up at Site)',
     'scrap': 'Scrap / Disposal',
 }
 
 MOVEMENT_COLORS = {
     'delivery': 'success',
     'transfer': 'primary',
+    'site_transfer': 'warning',
     'pullout': 'info',
     'adjustment': 'warning',
     'return': 'secondary',
