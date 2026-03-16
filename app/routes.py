@@ -640,7 +640,7 @@ def vendor_input():
     """
     warehouses = Warehouse.query.filter_by(is_active=True).order_by(Warehouse.name).all()
     categories = Category.query.order_by(Category.name).all()
-    existing_items = Item.query.filter_by(is_active=True).order_by(Item.name).all()
+    existing_items = Item.query.filter_by(is_active=True, item_type='consumable').order_by(Item.name).all()
 
     if request.method == 'POST':
         vendor_name = request.form.get('vendor_name', '').strip()

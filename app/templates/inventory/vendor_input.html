@@ -82,7 +82,10 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
         <div class="fw-semibold">
             Items <span class="badge bg-primary" id="rowCount">0</span>
-            <span class="text-muted fw-normal small ms-2">Toggle any row to "New" to add items not yet in the catalog</span>
+            <span class="text-muted fw-normal small ms-2">
+                "Existing" shows consumables/materials only &mdash; tools &amp; equipment use their own asset tracking.
+                Toggle to "New" to add a brand-new consumable not yet in the catalog.
+            </span>
         </div>
         <div class="bulk-bar">
             <span class="text-muted small">Add rows:</span>
@@ -188,10 +191,8 @@ function addRows(n) {
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <select name="rows[${idx}][new_item_type]" class="form-select form-select-sm" disabled>
-                                <option value="consumable">Consumable</option>
-                                <option value="asset">Tool/Equipment</option>
-                            </select>
+                            <input type="hidden" name="rows[${idx}][new_item_type]" value="consumable" disabled>
+                            <input class="form-control form-control-sm" value="Consumable / Material" disabled readonly style="background:#f1f5f9;color:#64748b;">
                         </div>
                     </div>
                 </div>
