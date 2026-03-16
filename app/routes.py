@@ -630,6 +630,197 @@ def item_import():
     return render_template('inventory/item_import.html', categories=categories)
 
 
+@main.route('/movements/vendor-input', methods=['GET', 'POST'])
+@login_required
+@permission_required('manage_movements')
+def vendor_input():
+    """Multi-item vendor input (purchase receipt).
+    Allows recording a vendor delivery with multiple items in one go.
+    New items not yet in the catalog can be created on the fly.
+    """
+    warehouses = Warehouse.query.filter_by(is_active=True).order_by(Warehouse.name).all()
+    categories = Category.query.order_by(Category.name).all()
+    existing_items = Item.query.filter_by(is_active=True).order_by(Item.name).all()
+
+    if request.method == 'POST':
+        vendor_name = request.form.get('vendor_name', '').strip()
+        reference = request.form.get('reference', '').strip()
+        delivery_date = request.form.get('delivery_date', '').strip()
+        dest_warehouse_id = int(request.form.get('dest_warehouse_id', 0) or 0)
+        notes_global = request.form.get('notes', '').strip()
+
+        if not dest_warehouse_id:
+            flash('Please select a destination warehouse.', 'danger')
+            return render_template('inventory/vendor_input.html',
+                                   warehouses=warehouses, categories=categories,
+                                   existing_items=existing_items, title='Vendor Input / Purchase Receipt')
+
+        wh = Warehouse.query.get(dest_warehouse_id)
+        if not wh:
+            flash('Invalid warehouse selected.', 'danger')
+            return render_template('inventory/vendor_input.html',
+                                   warehouses=warehouses, categories=categories,
+                                   existing_items=existing_items, title='Vendor Input / Purchase Receipt')
+
+        # Parse the item rows (indexed by row number)
+        row_indices = sorted(set(
+            k.split('[')[1].split(']')[0]
+            for k in request.form.keys()
+            if k.startswith('rows[')
+        ), key=lambda x: int(x))
+
+        created_items = []
+        movements_posted = []
+        errors = []
+
+        try:
+            mov_date = datetime.strptime(delivery_date, '%Y-%m-%d') if delivery_date else datetime.utcnow()
+        except ValueError:
+            mov_date = datetime.utcnow()
+
+        for idx in row_indices:
+            row_type = request.form.get(f'rows[{idx}][row_type]', 'existing')
+            qty_str = request.form.get(f'rows[{idx}][quantity]', '').strip()
+            unit_cost_str = request.form.get(f'rows[{idx}][unit_cost]', '0').strip()
+
+            try:
+                qty = float(qty_str)
+                if qty <= 0:
+                    raise ValueError()
+            except ValueError:
+                errors.append(f'Row {int(idx)+1}: Invalid quantity "{qty_str}".')
+                continue
+
+            try:
+                unit_cost = float(unit_cost_str or 0)
+            except ValueError:
+                unit_cost = 0
+
+            item = None
+
+            if row_type == 'existing':
+                item_id = int(request.form.get(f'rows[{idx}][item_id]', 0) or 0)
+                item = Item.query.get(item_id)
+                if not item:
+                    errors.append(f'Row {int(idx)+1}: No item selected.')
+                    continue
+
+            else:  # new item
+                new_sku = request.form.get(f'rows[{idx}][new_sku]', '').strip().upper()
+                new_name = request.form.get(f'rows[{idx}][new_name]', '').strip()
+                new_unit = request.form.get(f'rows[{idx}][new_unit]', '').strip()
+                new_item_type = request.form.get(f'rows[{idx}][new_item_type]', 'consumable')
+                new_cat_id = int(request.form.get(f'rows[{idx}][new_category_id]', 0) or 0) or None
+
+                if not new_name or not new_unit:
+                    errors.append(f'Row {int(idx)+1}: New item must have a Name and Unit.')
+                    continue
+
+                # Auto-generate SKU if blank
+                if not new_sku:
+                    base = ''.join(c for c in new_name.upper()[:6] if c.isalnum())
+                    candidate = base
+                    counter = 1
+                    while Item.query.filter_by(sku=candidate).first():
+                        candidate = f"{base}-{counter:03d}"
+                        counter += 1
+                    new_sku = candidate
+
+                # Check if SKU already exists — if so, use that item
+                existing = Item.query.filter_by(sku=new_sku).first()
+                if existing:
+                    item = existing
+                else:
+                    item = Item(
+                        sku=new_sku, name=new_name, unit=new_unit,
+                        unit_cost=unit_cost, item_type=new_item_type,
+                        category_id=new_cat_id, is_active=True
+                    )
+                    db.session.add(item)
+                    db.session.flush()  # get item.id
+                    created_items.append(f'{new_name} [{new_sku}]')
+
+            # Build movement notes
+            row_notes = []
+            if vendor_name:
+                row_notes.append(f'Vendor: {vendor_name}')
+            if notes_global:
+                row_notes.append(notes_global)
+
+            movement = Movement(
+                movement_type='delivery',
+                item_id=item.id,
+                quantity=qty,
+                unit_cost=unit_cost or float(item.unit_cost or 0),
+                from_location_type='external',
+                to_location_type='warehouse',
+                to_warehouse_id=dest_warehouse_id,
+                reference=reference or None,
+                notes=' | '.join(row_notes) if row_notes else None,
+                user_id=current_user.id,
+                date=mov_date,
+            )
+            db.session.add(movement)
+
+            _update_stock(item.id, 'warehouse', dest_warehouse_id, None, qty)
+            movements_posted.append({
+                'name': item.name,
+                'sku': item.sku,
+                'qty': qty,
+                'unit': item.unit,
+                'unit_cost': unit_cost,
+                'is_new': item.name in [n.split(' [')[0] for n in created_items],
+            })
+
+        if not movements_posted and not errors:
+            flash('No valid items were submitted. Please add at least one row.', 'warning')
+            return render_template('inventory/vendor_input.html',
+                                   warehouses=warehouses, categories=categories,
+                                   existing_items=existing_items, title='Vendor Input / Purchase Receipt')
+
+        if movements_posted:
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error saving: {str(e)}', 'danger')
+                return render_template('inventory/vendor_input.html',
+                                       warehouses=warehouses, categories=categories,
+                                       existing_items=existing_items, title='Vendor Input / Purchase Receipt')
+
+            for err in errors:
+                flash(err, 'warning')
+            return render_template('inventory/vendor_input_result.html',
+                                   vendor_name=vendor_name,
+                                   reference=reference,
+                                   wh=wh,
+                                   created_items=created_items,
+                                   movements=movements_posted,
+                                   title='Vendor Input — Receipt Confirmed')
+        else:
+            db.session.rollback()
+            for err in errors:
+                flash(err, 'danger')
+            return render_template('inventory/vendor_input.html',
+                                   warehouses=warehouses, categories=categories,
+                                   existing_items=existing_items, title='Vendor Input / Purchase Receipt')
+
+    import json as _json
+    items_json = _json.dumps([
+        {'id': i.id, 'name': i.name, 'sku': i.sku, 'unit': i.unit,
+         'unit_cost': float(i.unit_cost or 0)}
+        for i in existing_items
+    ])
+    cats_json = _json.dumps([{'id': c.id, 'name': c.name} for c in categories])
+    return render_template('inventory/vendor_input.html',
+                           warehouses=warehouses, categories=categories,
+                           existing_items=existing_items,
+                           existing_items_json=items_json,
+                           categories_json=cats_json,
+                           now=datetime.utcnow(),
+                           title='Vendor Input / Purchase Receipt')
+
+
 @main.route('/items/quick-add', methods=['POST'])
 @login_required
 @permission_required('manage_inventory')

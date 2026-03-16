@@ -1,0 +1,258 @@
+{% extends 'layouts/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}Vendor Input / Purchase Receipt{% endblock %}
+{% block extra_css %}
+<style>
+.row-card { border:1px solid #e2e8f0; border-radius:10px; padding:1rem; background:#fff; position:relative; margin-bottom:.75rem; }
+.row-card:hover { border-color:#1a6fd4; }
+.row-num { width:28px; height:28px; border-radius:50%; background:#e8f0fe; color:#1a6fd4; font-weight:700; font-size:.8rem; display:flex;align-items:center;justify-content:center; flex-shrink:0; }
+.type-toggle { display:flex; gap:.5rem; }
+.type-toggle label { flex:1; text-align:center; padding:.35rem .5rem; border:1.5px solid #e2e8f0; border-radius:7px; cursor:pointer; font-size:.8rem; font-weight:600; transition:.12s; }
+.type-toggle input[type=radio]:checked + label { border-color:#1a6fd4; background:#eff6ff; color:#1a6fd4; }
+.type-toggle input[type=radio] { display:none; }
+.new-item-fields { background:#f8fafc; border-radius:8px; padding:.75rem; margin-top:.5rem; border:1px solid #e2e8f0; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div>
+        <h1>Vendor Input / Purchase Receipt</h1>
+        <p>Record stock received from a vendor. Mix existing and new items in one receipt.</p>
+    </div>
+    <a href="{{ url_for('main.movement_list') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+</div>
+
+<div class="alert d-flex align-items-start gap-2 mb-4" style="background:#eff6ff;border:1px solid #bfdbfe;">
+    <i class="bi bi-info-circle-fill text-primary mt-1 flex-shrink-0"></i>
+    <div class="small">
+        <strong>New items not in the catalog?</strong> Toggle any row to <strong>"New Item"</strong> and fill in the details — the item will be automatically added to the catalog and the stock will be recorded at the same time.
+        <br>Items already in the system? Use <strong>"Existing Item"</strong> and pick from the dropdown.
+    </div>
+</div>
+
+<form method="POST" id="vendorForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- ─── Vendor / Receipt Header ─── -->
+    <div class="card mb-4">
+        <div class="card-header">Receipt Details</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Vendor / Supplier Name</label>
+                    <input name="vendor_name" class="form-control" placeholder="e.g. ABC Hardware Supply" autocomplete="off">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">PO / Reference #</label>
+                    <input name="reference" class="form-control" placeholder="PO-2024-001">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Delivery Date</label>
+                    <input name="delivery_date" type="date" class="form-control" value="{{ now.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Receive into Warehouse <span class="text-danger">*</span></label>
+                    <select name="dest_warehouse_id" class="form-select" required>
+                        <option value="">— Select Warehouse —</option>
+                        {% for wh in warehouses %}
+                        <option value="{{ wh.id }}">{{ wh.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Notes (applies to all items)</label>
+                    <input name="notes" class="form-control" placeholder="e.g. Delivery from supplier for Q1 project">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Item Rows ─── -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="fw-semibold">Items Received <span class="badge bg-primary" id="rowCount">1</span></div>
+        <button type="button" class="btn btn-sm btn-primary" id="addRowBtn">
+            <i class="bi bi-plus-lg me-1"></i>Add Item Row
+        </button>
+    </div>
+
+    <div id="rowsContainer"></div>
+
+    <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check2-circle me-2"></i>Post Receipt
+        </button>
+        <a href="{{ url_for('main.movement_list') }}" class="btn btn-outline-secondary px-4">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+const existingItems = {{ existing_items_json | safe }};
+const categories = {{ categories_json | safe }};
+let rowCounter = 0;
+
+function buildItemOptions(selected = 0) {
+    let opts = '<option value="">— Select existing item —</option>';
+    existingItems.forEach(item => {
+        opts += `<option value="${item.id}" data-cost="${item.unit_cost}" data-unit="${item.unit}" ${selected == item.id ? 'selected' : ''}>${item.name} [${item.sku}] — ${item.unit}</option>`;
+    });
+    return opts;
+}
+
+function buildCategoryOptions() {
+    let opts = '<option value="">— No category —</option>';
+    categories.forEach(c => {
+        opts += `<option value="${c.id}">${c.name}</option>`;
+    });
+    return opts;
+}
+
+function addRow() {
+    const idx = rowCounter++;
+    const el = document.createElement('div');
+    el.className = 'row-card';
+    el.id = `rowCard_${idx}`;
+    el.innerHTML = `
+    <div class="d-flex align-items-start gap-3">
+        <div class="row-num">${idx + 1}</div>
+        <div class="flex-grow-1">
+            <!-- Toggle -->
+            <div class="d-flex align-items-center gap-3 mb-2">
+                <div class="type-toggle">
+                    <input type="radio" name="rows[${idx}][row_type]" id="existing_${idx}" value="existing" checked onchange="toggleRowType(${idx})">
+                    <label for="existing_${idx}"><i class="bi bi-search me-1"></i>Existing Item</label>
+                    <input type="radio" name="rows[${idx}][row_type]" id="new_${idx}" value="new" onchange="toggleRowType(${idx})">
+                    <label for="new_${idx}"><i class="bi bi-plus-circle me-1"></i>New Item</label>
+                </div>
+            </div>
+
+            <!-- Existing item fields -->
+            <div id="existingFields_${idx}">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label form-label-sm">Item</label>
+                        <select name="rows[${idx}][item_id]" class="form-select form-select-sm" id="itemSel_${idx}" onchange="onItemChange(${idx})">
+                            ${buildItemOptions()}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm">Quantity <span class="text-danger">*</span></label>
+                        <input name="rows[${idx}][quantity]" type="number" step="0.01" min="0.01" class="form-control form-control-sm" placeholder="0" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm">Unit Cost (₱)</label>
+                        <input name="rows[${idx}][unit_cost]" type="number" step="0.01" min="0" class="form-control form-control-sm" id="costField_${idx}" placeholder="0.00">
+                    </div>
+                    <div class="col-md-2">
+                        <span class="text-muted small" id="unitLabel_${idx}"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- New item fields -->
+            <div id="newFields_${idx}" class="d-none">
+                <div class="new-item-fields">
+                    <div class="form-text fw-semibold mb-2 text-primary"><i class="bi bi-plus-circle me-1"></i>New Item — will be added to catalog automatically</div>
+                    <div class="row g-2">
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm">SKU / Code</label>
+                            <input name="rows[${idx}][new_sku]" class="form-control form-control-sm" placeholder="Auto-generate if blank" style="text-transform:uppercase;">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm">Item Name <span class="text-danger">*</span></label>
+                            <input name="rows[${idx}][new_name]" class="form-control form-control-sm" placeholder="e.g. Portland Cement 40kg">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm">Unit <span class="text-danger">*</span></label>
+                            <input name="rows[${idx}][new_unit]" class="form-control form-control-sm" placeholder="pcs, kg, bag…">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm">Category</label>
+                            <select name="rows[${idx}][new_category_id]" class="form-select form-select-sm">
+                                ${buildCategoryOptions()}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm">Item Type</label>
+                            <select name="rows[${idx}][new_item_type]" class="form-select form-select-sm">
+                                <option value="consumable">Consumable / Material</option>
+                                <option value="asset">Tool / Equipment</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-2 mt-1 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm">Quantity Received <span class="text-danger">*</span></label>
+                        <input name="rows[${idx}][quantity]" type="number" step="0.01" min="0.01" class="form-control form-control-sm" placeholder="0" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm">Unit Cost (₱)</label>
+                        <input name="rows[${idx}][unit_cost]" type="number" step="0.01" min="0" class="form-control form-control-sm" placeholder="0.00">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto flex-shrink-0" onclick="removeRow(${idx})" title="Remove row">
+            <i class="bi bi-trash"></i>
+        </button>
+    </div>`;
+    document.getElementById('rowsContainer').appendChild(el);
+    // Disable new-item fields by default (existing is the default mode)
+    document.getElementById(`newFields_${idx}`).querySelectorAll('input, select').forEach(e => e.disabled = true);
+    updateRowCount();
+    document.getElementById('rowsContainer').lastElementChild.querySelector('select, input').focus();
+}
+
+function removeRow(idx) {
+    const el = document.getElementById(`rowCard_${idx}`);
+    if (el) {
+        el.style.opacity = '0.4';
+        setTimeout(() => el.remove(), 180);
+    }
+    setTimeout(updateRowCount, 200);
+}
+
+function toggleRowType(idx) {
+    const isNew = document.getElementById(`new_${idx}`).checked;
+    const existDiv = document.getElementById(`existingFields_${idx}`);
+    const newDiv = document.getElementById(`newFields_${idx}`);
+    existDiv.classList.toggle('d-none', isNew);
+    newDiv.classList.toggle('d-none', !isNew);
+    // Disable inputs in the hidden section so they don't submit
+    existDiv.querySelectorAll('input, select').forEach(el => el.disabled = isNew);
+    newDiv.querySelectorAll('input, select').forEach(el => el.disabled = !isNew);
+}
+
+function onItemChange(idx) {
+    const sel = document.getElementById(`itemSel_${idx}`);
+    const opt = sel.options[sel.selectedIndex];
+    const cost = opt.dataset.cost || '';
+    const unit = opt.dataset.unit || '';
+    const costField = document.getElementById(`costField_${idx}`);
+    const unitLabel = document.getElementById(`unitLabel_${idx}`);
+    if (costField && cost) costField.value = parseFloat(cost).toFixed(2);
+    if (unitLabel) unitLabel.textContent = unit ? `per ${unit}` : '';
+}
+
+function updateRowCount() {
+    const count = document.querySelectorAll('#rowsContainer .row-card').length;
+    document.getElementById('rowCount').textContent = count;
+}
+
+// Add first row on load
+addRow();
+document.getElementById('addRowBtn').addEventListener('click', addRow);
+
+// Prevent submit with no rows
+document.getElementById('vendorForm').addEventListener('submit', function(e) {
+    const rows = document.querySelectorAll('#rowsContainer .row-card');
+    if (rows.length === 0) {
+        e.preventDefault();
+        alert('Please add at least one item row.');
+    }
+});
+</script>
+{% endblock %}

@@ -21,6 +21,7 @@ A comprehensive movement-based inventory management system for companies managin
 - **Warehouses** — Multiple storage facilities with stock tracking and value calculation
 - **Project Sites** — Split view: Tools/Equipment (deployed units) vs Materials (consumable stock); both with pullout actions
 - **Material Requisitions** — Full workflow: submit → approve/reject → fulfill (auto-transfers stock)
+- **Vendor Input / Purchase Receipt** — Multi-item intake form (`/movements/vendor-input`). Mix existing catalog items and brand-new items (auto-created on the fly) in one receipt. Generates Input movements and adds new items to catalog atomically.
 - **Reports** — Stock levels matrix, movement log with filters, low stock alerts
 - **User Management** — 7 roles with permission-based access control (admin only)
 - **Profile** — Password change for all users

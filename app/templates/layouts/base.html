@@ -160,8 +160,13 @@
 
     <div class="sidebar-section">Operations</div>
     <div class="nav-item-s">
-        <a href="{{ url_for('main.movement_list') }}" class="{{ 'active' if 'movement' in (request.endpoint or '') }}">
+        <a href="{{ url_for('main.movement_list') }}" class="{{ 'active' if request.endpoint == 'main.movement_list' or request.endpoint == 'main.movement_create' or request.endpoint == 'main.movement_detail' }}">
             <i class="bi bi-arrow-left-right"></i> Movements
+        </a>
+    </div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.vendor_input') }}" class="{{ 'active' if request.endpoint == 'main.vendor_input' }}">
+            <i class="bi bi-truck"></i> Vendor Input
         </a>
     </div>
     <div class="nav-item-s">
@@ -235,6 +240,7 @@
                     <i class="bi bi-plus-lg me-1"></i> New
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                    <li><a class="dropdown-item" href="{{ url_for('main.vendor_input') }}"><i class="bi bi-truck me-2"></i>Vendor Input / Purchase</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('main.movement_create') }}"><i class="bi bi-arrow-left-right me-2"></i>Post Movement</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('main.request_create') }}"><i class="bi bi-clipboard2-plus me-2"></i>New Requisition</a></li>
                     <li><hr class="dropdown-divider"></li>
