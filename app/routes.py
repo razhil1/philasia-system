@@ -205,6 +205,240 @@ def item_edit(item_id):
     return render_template('inventory/item_form.html', form=form, title='Edit Item', item=item)
 
 
+# ─── ITEMS BULK IMPORT ────────────────────────────────────────────────────────
+
+ALLOWED_IMPORT_EXTS = {'xlsx', 'xls', 'csv'}
+
+def _allowed_import(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMPORT_EXTS
+
+
+@main.route('/items/import/template')
+@login_required
+@permission_required('manage_inventory')
+def item_import_template():
+    """Download a blank Excel template for bulk item import."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from flask import send_file
+    import io
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Items Import'
+
+    headers = ['SKU*', 'Name*', 'Category', 'Unit*', 'Unit Cost', 'Reorder Level', 'Description']
+    col_widths = [18, 40, 25, 12, 14, 16, 45]
+
+    header_fill = PatternFill(start_color='1a6fd4', end_color='1a6fd4', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    thin = Side(style='thin', color='D0D0D0')
+    border = Border(left=thin, right=thin, bottom=thin)
+
+    for col_idx, (header, width) in enumerate(zip(headers, col_widths), 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.column_dimensions[chr(64 + col_idx)].width = width
+
+    ws.row_dimensions[1].height = 28
+
+    # Sample rows
+    cats = [c.name for c in Category.query.order_by('name').limit(5).all()]
+    samples = [
+        ['TOOL-001', 'Safety Helmet (White)', cats[0] if cats else 'Safety Gear', 'pcs', 350.00, 20, 'Standard white hard hat'],
+        ['TOOL-002', 'Work Gloves (Leather)', cats[0] if cats else 'Safety Gear', 'pairs', 120.00, 30, 'Heavy duty leather gloves'],
+        ['MAT-001', 'Portland Cement', cats[1] if len(cats) > 1 else 'Materials', 'bags', 280.00, 50, '40kg bag Portland Type I'],
+        ['MAT-002', 'Steel Rebar 10mm x 6m', cats[1] if len(cats) > 1 else 'Materials', 'pcs', 180.00, 100, 'Grade 60 deformed bar'],
+        ['ELEC-001', 'THHN Wire 3.5mm', cats[2] if len(cats) > 2 else 'Electrical', 'm', 75.00, 200, 'THHN/THWN stranded wire'],
+    ]
+    alt_fill = PatternFill(start_color='EEF4FF', end_color='EEF4FF', fill_type='solid')
+
+    for row_idx, row_data in enumerate(samples, 2):
+        for col_idx, val in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.border = border
+            cell.alignment = Alignment(vertical='center')
+            if row_idx % 2 == 0:
+                cell.fill = alt_fill
+
+    # Instructions sheet
+    ws_info = wb.create_sheet('Instructions')
+    ws_info.column_dimensions['A'].width = 60
+    notes = [
+        ('PhilAsia Pro — Items Import Template', True),
+        ('', False),
+        ('COLUMN GUIDE:', True),
+        ('SKU* — Unique item code (required). Will be skipped if already exists.', False),
+        ('Name* — Item display name (required).', False),
+        ('Category — Must match an existing category name exactly. Leave blank for none.', False),
+        ('Unit* — Unit of measure (pcs, kg, bags, m, liters, etc.) — required.', False),
+        ('Unit Cost — Cost per unit in Philippine Peso. Default 0.', False),
+        ('Reorder Level — Low stock alert threshold. Default 0.', False),
+        ('Description — Optional. Additional details about the item.', False),
+        ('', False),
+        ('TIPS:', True),
+        ('• Rows with duplicate SKUs are skipped (existing items not overwritten).', False),
+        ('• Rows missing SKU, Name, or Unit are skipped.', False),
+        ('• Import supports .xlsx, .xls, and .csv formats.', False),
+        ('• A summary of created / skipped rows is shown after import.', False),
+    ]
+    title_fill = PatternFill(start_color='1a6fd4', end_color='1a6fd4', fill_type='solid')
+    for r, (text, bold) in enumerate(notes, 1):
+        cell = ws_info.cell(row=r, column=1, value=text)
+        cell.font = Font(bold=bold, color='FFFFFF' if r == 1 else '111111', size=11 if bold else 10)
+        if r == 1:
+            cell.fill = title_fill
+            ws_info.row_dimensions[r].height = 26
+
+    # Freeze header row on import sheet
+    ws.freeze_panes = 'A2'
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     download_name='philasia_items_import_template.xlsx', as_attachment=True)
+
+
+@main.route('/items/import', methods=['GET', 'POST'])
+@login_required
+@permission_required('manage_inventory')
+def item_import():
+    categories = Category.query.order_by('name').all()
+
+    if request.method == 'POST':
+        file = request.files.get('import_file')
+        if not file or not file.filename:
+            flash('Please select a file to import.', 'danger')
+            return redirect(url_for('main.item_import'))
+        if not _allowed_import(file.filename):
+            flash('Unsupported file format. Please upload .xlsx, .xls, or .csv.', 'danger')
+            return redirect(url_for('main.item_import'))
+
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        created, skipped, errors = [], [], []
+
+        try:
+            if ext == 'csv':
+                import csv, io
+                stream = io.StringIO(file.stream.read().decode('utf-8-sig'))
+                reader = csv.DictReader(stream)
+                rows = [r for r in reader]
+            else:
+                import openpyxl
+                wb = openpyxl.load_workbook(file, data_only=True)
+                ws = wb.active
+                raw_headers = [str(c.value).strip().rstrip('*') if c.value else '' for c in ws[1]]
+                # Normalize headers
+                header_map = {h.lower(): i for i, h in enumerate(raw_headers)}
+                def get_col(row, name):
+                    idx = header_map.get(name.lower())
+                    return str(row[idx].value).strip() if idx is not None and row[idx].value is not None else ''
+                rows = [{'sku': get_col(r, 'sku'), 'name': get_col(r, 'name'),
+                         'category': get_col(r, 'category'), 'unit': get_col(r, 'unit'),
+                         'unit cost': get_col(r, 'unit cost'), 'reorder level': get_col(r, 'reorder level'),
+                         'description': get_col(r, 'description')}
+                        for r in ws.iter_rows(min_row=2) if any(c.value for c in r)]
+
+            cat_map = {c.name.lower(): c.id for c in categories}
+
+            for i, row in enumerate(rows, 2):
+                sku = (row.get('sku') or row.get('SKU') or row.get('SKU*') or '').strip()
+                name = (row.get('name') or row.get('Name') or row.get('Name*') or '').strip()
+                unit = (row.get('unit') or row.get('Unit') or row.get('Unit*') or '').strip()
+
+                if not sku or not name or not unit:
+                    skipped.append({'row': i, 'reason': 'Missing SKU, Name, or Unit', 'sku': sku or '(blank)'})
+                    continue
+
+                if Item.query.filter_by(sku=sku).first():
+                    skipped.append({'row': i, 'reason': f'SKU already exists', 'sku': sku})
+                    continue
+
+                cat_name = (row.get('category') or row.get('Category') or '').strip().lower()
+                cat_id = cat_map.get(cat_name)
+
+                try:
+                    unit_cost = float(row.get('unit cost') or row.get('Unit Cost') or row.get('unit_cost') or 0)
+                except (ValueError, TypeError):
+                    unit_cost = 0
+                try:
+                    reorder = float(row.get('reorder level') or row.get('Reorder Level') or row.get('reorder_level') or 0)
+                except (ValueError, TypeError):
+                    reorder = 0
+
+                desc = (row.get('description') or row.get('Description') or '').strip()
+
+                item = Item(sku=sku, name=name, unit=unit, unit_cost=unit_cost,
+                            reorder_level=reorder, description=desc,
+                            category_id=cat_id, is_active=True)
+                db.session.add(item)
+                created.append({'sku': sku, 'name': name})
+
+            db.session.commit()
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Import failed: {str(e)}', 'danger')
+            return redirect(url_for('main.item_import'))
+
+        result = {'created': created, 'skipped': skipped}
+        flash(f'{len(created)} items imported successfully. {len(skipped)} rows skipped.', 'success' if created else 'warning')
+        return render_template('inventory/item_import_result.html', result=result)
+
+    return render_template('inventory/item_import.html', categories=categories)
+
+
+@main.route('/items/quick-add', methods=['POST'])
+@login_required
+@permission_required('manage_inventory')
+def item_quick_add():
+    """API endpoint for inline quick-add of multiple items."""
+    data = request.get_json()
+    if not data or not isinstance(data, list):
+        return jsonify({'success': False, 'error': 'Invalid data'}), 400
+
+    cat_map = {c.name.lower(): c.id for c in Category.query.all()}
+    created, errors = [], []
+
+    for i, row in enumerate(data):
+        sku = (row.get('sku') or '').strip()
+        name = (row.get('name') or '').strip()
+        unit = (row.get('unit') or '').strip()
+
+        if not sku or not name or not unit:
+            errors.append({'row': i + 1, 'error': 'SKU, Name, and Unit are required'})
+            continue
+        if Item.query.filter_by(sku=sku).first():
+            errors.append({'row': i + 1, 'error': f'SKU "{sku}" already exists'})
+            continue
+
+        cat_name = (row.get('category') or '').strip().lower()
+        try:
+            item = Item(
+                sku=sku, name=name, unit=unit,
+                unit_cost=float(row.get('unit_cost') or 0),
+                reorder_level=float(row.get('reorder_level') or 0),
+                description=(row.get('description') or '').strip(),
+                category_id=cat_map.get(cat_name),
+                is_active=True
+            )
+            db.session.add(item)
+            created.append({'sku': sku, 'name': name})
+        except Exception as e:
+            errors.append({'row': i + 1, 'error': str(e)})
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    return jsonify({'success': True, 'created': created, 'errors': errors})
+
+
 # ─── WAREHOUSES ───────────────────────────────────────────────────────────────
 
 @main.route('/warehouses')

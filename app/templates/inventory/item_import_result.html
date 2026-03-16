@@ -1,0 +1,84 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Import Results{% endblock %}
+{% block page_title %}Import Results{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div><h1>Import Results</h1><p>Summary of your bulk item import.</p></div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('main.item_import') }}" class="btn btn-outline-secondary btn-sm">Import More</a>
+        <a href="{{ url_for('main.item_list') }}" class="btn btn-primary btn-sm">View All Items</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="stat-icon bg-success bg-opacity-10 text-success mx-auto" style="width:48px;height:48px;border-radius:12px;font-size:1.4rem;"><i class="bi bi-check-lg"></i></div>
+            <div class="stat-num text-success mt-2">{{ result.created|length }}</div>
+            <div class="stat-label">Items Created</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="stat-icon bg-warning bg-opacity-10 text-warning mx-auto" style="width:48px;height:48px;border-radius:12px;font-size:1.4rem;"><i class="bi bi-skip-forward"></i></div>
+            <div class="stat-num text-warning mt-2">{{ result.skipped|length }}</div>
+            <div class="stat-label">Rows Skipped</div>
+        </div>
+    </div>
+</div>
+
+{% if result.created %}
+<div class="card mb-4">
+    <div class="card-header d-flex align-items-center gap-2 text-success">
+        <i class="bi bi-check-circle-fill"></i>
+        <span class="fw-bold">Successfully Created — {{ result.created|length }} items</span>
+    </div>
+    <div class="table-responsive">
+    <table class="table table-sm mb-0">
+        <thead><tr><th>#</th><th>SKU</th><th>Name</th></tr></thead>
+        <tbody>
+        {% for item in result.created %}
+        <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td><code>{{ item.sku }}</code></td>
+            <td class="fw-semibold">{{ item.name }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+{% if result.skipped %}
+<div class="card mb-4">
+    <div class="card-header d-flex align-items-center gap-2 text-warning">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span class="fw-bold">Skipped Rows — {{ result.skipped|length }}</span>
+    </div>
+    <div class="table-responsive">
+    <table class="table table-sm mb-0">
+        <thead><tr><th>Row</th><th>SKU</th><th>Reason</th></tr></thead>
+        <tbody>
+        {% for s in result.skipped %}
+        <tr>
+            <td class="text-muted">{{ s.row }}</td>
+            <td><code>{{ s.sku }}</code></td>
+            <td class="text-warning">{{ s.reason }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+{% if not result.created and not result.skipped %}
+<div class="card p-5 text-center">
+    <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
+    <h5>No data found in the file</h5>
+    <p class="text-muted">Make sure your file has data starting from row 2 with the correct headers.</p>
+    <a href="{{ url_for('main.item_import') }}" class="btn btn-primary">Try Again</a>
+</div>
+{% endif %}
+{% endblock %}

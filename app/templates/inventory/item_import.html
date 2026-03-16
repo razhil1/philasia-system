@@ -1,0 +1,372 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Bulk Import Items{% endblock %}
+{% block page_title %}Bulk Import Items{% endblock %}
+
+{% block extra_css %}
+<style>
+.tab-pill { border-radius: 10px; border: 2px solid var(--border); padding: 1.25rem; cursor: pointer; transition: all .15s; }
+.tab-pill.active { border-color: var(--primary); background: #eef4ff; }
+.tab-pill .tab-icon { font-size: 2rem; margin-bottom: .5rem; }
+
+/* Quick-add table */
+#qaTable { font-size: .875rem; }
+#qaTable th { font-size: .73rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: #64748b; background: #f8fafc; }
+#qaTable td { padding: .45rem .5rem; vertical-align: middle; }
+#qaTable input, #qaTable select { border: 1px solid #e2e8f0; border-radius: 6px; padding: .3rem .5rem; font-size: .82rem; width: 100%; background: #fff; }
+#qaTable input:focus, #qaTable select:focus { outline: none; border-color: #1a6fd4; box-shadow: 0 0 0 2px rgba(26,111,212,.12); }
+.qa-row-num { color: #94a3b8; font-weight: 700; font-size: .75rem; min-width: 28px; text-align: center; }
+.qa-remove { color: #ef4444; cursor: pointer; background: none; border: none; font-size: 1rem; padding: .2rem .4rem; border-radius: 4px; }
+.qa-remove:hover { background: #fee2e2; }
+
+/* Status chips on result */
+.import-ok { color: #15803d; }
+.import-skip { color: #b45309; }
+
+.drop-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 3rem 2rem; text-align: center; cursor: pointer; transition: all .2s; background: #f8fafc; }
+.drop-zone.drag-over { border-color: #1a6fd4; background: #eef4ff; }
+.drop-zone .dz-icon { font-size: 2.5rem; color: #94a3b8; }
+.drop-zone.has-file { border-color: #10b981; background: #f0fdf4; }
+.drop-zone.has-file .dz-icon { color: #10b981; }
+
+.step-num { width: 28px; height: 28px; background: var(--primary); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .82rem; flex-shrink: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div>
+        <h1>Bulk Import Items</h1>
+        <p>Add many items at once via Excel upload or the inline quick-add table.</p>
+    </div>
+    <a href="{{ url_for('main.item_list') }}" class="btn btn-outline-secondary btn-sm">← Back to Items</a>
+</div>
+
+<!-- Mode Switcher -->
+<div class="row g-3 mb-4" id="modeSwitcher">
+    <div class="col-md-6">
+        <div class="tab-pill active text-center" onclick="switchMode('excel')" id="pill-excel">
+            <div class="tab-icon"><i class="bi bi-file-earmark-excel text-success"></i></div>
+            <div class="fw-bold">Excel / CSV Import</div>
+            <div class="text-muted small mt-1">Upload a spreadsheet with hundreds of items at once</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="tab-pill text-center" onclick="switchMode('quick')" id="pill-quick">
+            <div class="tab-icon"><i class="bi bi-table text-primary"></i></div>
+            <div class="fw-bold">Quick-Add Table</div>
+            <div class="text-muted small mt-1">Type in items directly — great for adding 5–20 items fast</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ EXCEL IMPORT PANEL ═══════════════════════════════════════════════════ -->
+<div id="panel-excel">
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header fw-bold"><i class="bi bi-lightbulb me-2 text-warning"></i>How It Works</div>
+                <div class="card-body">
+                    <div class="d-flex gap-3 mb-3">
+                        <div class="step-num">1</div>
+                        <div>
+                            <div class="fw-semibold small">Download the Template</div>
+                            <div class="text-muted" style="font-size:.8rem;">Get the official Excel file with column headers and sample data pre-filled.</div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3 mb-3">
+                        <div class="step-num">2</div>
+                        <div>
+                            <div class="fw-semibold small">Fill in Your Data</div>
+                            <div class="text-muted" style="font-size:.8rem;">Replace the sample rows with your actual items. SKU, Name, and Unit are required.</div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3 mb-3">
+                        <div class="step-num">3</div>
+                        <div>
+                            <div class="fw-semibold small">Upload & Import</div>
+                            <div class="text-muted" style="font-size:.8rem;">Drop or browse for your file. The system imports all valid rows and shows a summary.</div>
+                        </div>
+                    </div>
+                    <hr>
+                    <a href="{{ url_for('main.item_import_template') }}" class="btn btn-success w-100">
+                        <i class="bi bi-download me-2"></i>Download Excel Template
+                    </a>
+                    <div class="text-muted text-center mt-2" style="font-size:.75rem;">Includes sample data and instructions sheet</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header fw-bold"><i class="bi bi-upload me-2"></i>Upload File</div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="importForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="drop-zone mb-4" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                            <div class="dz-icon mb-2" id="dzIcon"><i class="bi bi-cloud-upload"></i></div>
+                            <div class="fw-semibold" id="dzText">Drop your file here or click to browse</div>
+                            <div class="text-muted small mt-1" id="dzSub">Supports: .xlsx, .xls, .csv</div>
+                        </div>
+                        <input type="file" id="fileInput" name="import_file" accept=".xlsx,.xls,.csv" class="d-none">
+
+                        <div class="mb-3 p-3 bg-light rounded" style="font-size:.82rem;">
+                            <div class="fw-bold mb-2 text-muted">Available Categories (use exact names):</div>
+                            <div class="d-flex flex-wrap gap-1">
+                            {% for cat in categories %}
+                                <span class="badge bg-secondary bg-opacity-15 text-secondary">{{ cat.name }}</span>
+                            {% else %}
+                                <span class="text-muted">No categories yet — <a href="{{ url_for('main.category_create') }}">create one</a></span>
+                            {% endfor %}
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary px-4" id="importBtn" disabled>
+                            <i class="bi bi-cloud-upload me-2"></i>Import Items
+                        </button>
+                        <span class="text-muted small ms-3" id="fileNameDisplay">No file selected</span>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ QUICK-ADD TABLE PANEL ════════════════════════════════════════════════ -->
+<div id="panel-quick" class="d-none">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold"><i class="bi bi-table me-2"></i>Quick-Add Table</span>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="addRows(5)"><i class="bi bi-plus me-1"></i>+5 Rows</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="clearTable()"><i class="bi bi-trash me-1"></i>Clear</button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+            <table class="table mb-0" id="qaTable">
+                <thead>
+                    <tr>
+                        <th style="width:30px;">#</th>
+                        <th style="width:130px;">SKU <span class="text-danger">*</span></th>
+                        <th style="min-width:200px;">Item Name <span class="text-danger">*</span></th>
+                        <th style="width:160px;">Category</th>
+                        <th style="width:90px;">Unit <span class="text-danger">*</span></th>
+                        <th style="width:110px;">Unit Cost (₱)</th>
+                        <th style="width:110px;">Reorder Level</th>
+                        <th style="min-width:200px;">Description</th>
+                        <th style="width:36px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="qaBody"></tbody>
+            </table>
+            </div>
+        </div>
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <div class="text-muted small"><span id="qaCount">0</span> rows · Fields marked <span class="text-danger">*</span> are required</div>
+            <div class="d-flex gap-2 align-items-center">
+                <div id="qaStatus" class="small"></div>
+                <button class="btn btn-primary px-4" onclick="submitQuickAdd()" id="qaSubmitBtn">
+                    <i class="bi bi-check-lg me-1"></i>Save All Items
+                </button>
+            </div>
+        </div>
+    </div>
+    <div id="qaResultPanel" class="mt-3 d-none"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CATEGORIES = [{% for c in categories %}"{{ c.name }}"{% if not loop.last %},{% endif %}{% endfor %}];
+let rowCount = 0;
+
+// ── Mode Switch ──────────────────────────────────────────────────────────────
+function switchMode(mode) {
+    document.getElementById('panel-excel').classList.toggle('d-none', mode !== 'excel');
+    document.getElementById('panel-quick').classList.toggle('d-none', mode !== 'quick');
+    document.getElementById('pill-excel').classList.toggle('active', mode === 'excel');
+    document.getElementById('pill-quick').classList.toggle('active', mode === 'quick');
+    if (mode === 'quick' && document.getElementById('qaBody').children.length === 0) addRows(10);
+}
+
+// ── Quick-Add Table ──────────────────────────────────────────────────────────
+function makeRow(n) {
+    const catOptions = '<option value="">— None —</option>' + CATEGORIES.map(c => `<option>${c}</option>`).join('');
+    const unitSuggestions = ['pcs', 'bags', 'kg', 'm', 'liters', 'pairs', 'sets', 'rolls', 'boxes', 'sheets'].map(u => `<option>${u}</option>`).join('');
+    return `<tr id="row-${n}">
+        <td class="qa-row-num">${n}</td>
+        <td><input type="text" placeholder="e.g. MAT-001" data-col="sku" list="skuSuggestions"></td>
+        <td><input type="text" placeholder="Item full name" data-col="name"></td>
+        <td><select data-col="category">${catOptions}</select></td>
+        <td><input type="text" placeholder="pcs" data-col="unit" list="unitList"><datalist id="unitList">${unitSuggestions}</datalist></td>
+        <td><input type="number" placeholder="0.00" step="0.01" min="0" data-col="unit_cost"></td>
+        <td><input type="number" placeholder="0" step="0.01" min="0" data-col="reorder_level"></td>
+        <td><input type="text" placeholder="Optional description" data-col="description"></td>
+        <td><button class="qa-remove" onclick="removeRow(${n})" title="Remove row"><i class="bi bi-x-lg"></i></button></td>
+    </tr>`;
+}
+
+function addRows(n = 1) {
+    const tbody = document.getElementById('qaBody');
+    for (let i = 0; i < n; i++) {
+        rowCount++;
+        tbody.insertAdjacentHTML('beforeend', makeRow(rowCount));
+    }
+    updateCount();
+    // Auto-tab: press Enter moves to next cell
+    tbody.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                const allInputs = [...tbody.querySelectorAll('input, select')];
+                const idx = allInputs.indexOf(this);
+                if (idx < allInputs.length - 1) allInputs[idx + 1].focus();
+            }
+        });
+    });
+}
+
+function removeRow(n) {
+    const row = document.getElementById(`row-${n}`);
+    if (row) { row.remove(); updateCount(); }
+}
+
+function clearTable() {
+    if (!confirm('Clear all rows?')) return;
+    document.getElementById('qaBody').innerHTML = '';
+    rowCount = 0;
+    updateCount();
+}
+
+function updateCount() {
+    document.getElementById('qaCount').textContent = document.getElementById('qaBody').children.length;
+}
+
+async function submitQuickAdd() {
+    const rows = [...document.getElementById('qaBody').querySelectorAll('tr')];
+    const data = rows.map(row => {
+        const get = col => (row.querySelector(`[data-col="${col}"]`)?.value || '').trim();
+        return { sku: get('sku'), name: get('name'), category: get('category'), unit: get('unit'),
+                 unit_cost: get('unit_cost') || 0, reorder_level: get('reorder_level') || 0, description: get('description') };
+    }).filter(r => r.sku || r.name); // exclude completely blank rows
+
+    if (!data.length) { alert('Please fill in at least one row.'); return; }
+
+    const btn = document.getElementById('qaSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving…';
+
+    const status = document.getElementById('qaStatus');
+    status.textContent = '';
+
+    try {
+        const res = await fetch('{{ url_for("main.item_quick_add") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify(data)
+        });
+        const result = await res.json();
+
+        if (!result.success) throw new Error(result.error);
+
+        // Show result panel
+        const panel = document.getElementById('qaResultPanel');
+        let html = '';
+
+        if (result.created.length) {
+            html += `<div class="alert alert-success d-flex align-items-start gap-2">
+                <i class="bi bi-check-circle-fill fs-5 mt-1"></i>
+                <div>
+                    <strong>${result.created.length} items created successfully.</strong>
+                    <div class="mt-1 d-flex flex-wrap gap-1">
+                        ${result.created.map(c => `<span class="badge bg-success bg-opacity-15 text-success">${c.sku} — ${c.name}</span>`).join('')}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        if (result.errors.length) {
+            html += `<div class="alert alert-warning">
+                <strong>${result.errors.length} row(s) had issues:</strong>
+                <ul class="mb-0 mt-1">
+                    ${result.errors.map(e => `<li>Row ${e.row}: ${e.error}</li>`).join('')}
+                </ul>
+            </div>`;
+        }
+
+        html += `<div class="d-flex gap-2 mt-2">
+            <a href="{{ url_for('main.item_list') }}" class="btn btn-primary btn-sm">View All Items</a>
+            <button class="btn btn-outline-secondary btn-sm" onclick="clearSuccessRows(${JSON.stringify(result.created)})">Clear Saved Rows</button>
+        </div>`;
+
+        panel.innerHTML = html;
+        panel.classList.remove('d-none');
+
+        if (result.created.length) {
+            // Highlight saved rows briefly then remove them
+            clearSuccessRowsAuto(result.created, rows, data);
+        }
+
+    } catch(err) {
+        document.getElementById('qaResultPanel').innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-circle me-2"></i>${err.message}</div>`;
+        document.getElementById('qaResultPanel').classList.remove('d-none');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save All Items';
+    }
+}
+
+function clearSuccessRowsAuto(created, rows, data) {
+    const createdSkus = new Set(created.map(c => c.sku));
+    rows.forEach((row, i) => {
+        if (createdSkus.has(data[i]?.sku)) {
+            row.style.background = '#dcfce7';
+            setTimeout(() => row.remove(), 1500);
+        }
+    });
+    setTimeout(updateCount, 1600);
+}
+
+function clearSuccessRows(created) {
+    const skus = new Set(created.map(c => c.sku));
+    document.querySelectorAll('#qaBody tr').forEach(row => {
+        const skuVal = row.querySelector('[data-col="sku"]')?.value?.trim();
+        if (skus.has(skuVal)) row.remove();
+    });
+    updateCount();
+}
+
+// ── Excel File Drop Zone ─────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const importBtn = document.getElementById('importBtn');
+
+function setFile(file) {
+    document.getElementById('dzIcon').innerHTML = '<i class="bi bi-file-earmark-excel text-success"></i>';
+    document.getElementById('dzText').textContent = file.name;
+    document.getElementById('dzSub').textContent = `${(file.size / 1024).toFixed(1)} KB — ready to import`;
+    document.getElementById('fileNameDisplay').textContent = file.name;
+    dropZone.classList.add('has-file');
+    importBtn.disabled = false;
+}
+
+fileInput.addEventListener('change', function() { if (this.files[0]) setFile(this.files[0]); });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) { fileInput.files = e.dataTransfer.files; setFile(file); }
+});
+
+document.getElementById('importForm').addEventListener('submit', function() {
+    importBtn.disabled = true;
+    importBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importing…';
+});
+</script>
+{% endblock %}
