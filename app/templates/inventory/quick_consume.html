@@ -115,12 +115,14 @@
                 <div class="text-muted" style="font-size:.78rem;font-weight:400;">Correct stock count after physical inventory</div>
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" id="adjForm">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="action" value="adjustment">
+                    <input type="hidden" name="adj_loc_id" id="adjLocId" value="">
+                    <input type="hidden" name="quantity" value="1">
                     <div class="mb-3">
                         <label class="form-label">Item</label>
-                        <select name="item_id" class="form-select adj-item" required>
+                        <select name="item_id" class="form-select" required>
                             <option value="">— Select item —</option>
                             {% for i in items %}
                             <option value="{{ i.id }}">{{ i.name }} [{{ i.sku }}] — {{ i.unit }}</option>
@@ -129,23 +131,23 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Location Type</label>
-                        <select name="adj_loc_type" class="form-select adj-loc-type" required>
+                        <select name="adj_loc_type" id="adjLocType" class="form-select" required>
                             <option value="warehouse">Warehouse</option>
                             <option value="site">Project Site</option>
                         </select>
                     </div>
-                    <div class="mb-3 adj-warehouse-row">
+                    <div class="mb-3" id="adjWarehouseRow">
                         <label class="form-label">Warehouse</label>
-                        <select name="adj_loc_id" class="form-select">
+                        <select id="adjWarehouseSel" class="form-select">
                             <option value="">— Select —</option>
                             {% for w in warehouses %}
                             <option value="{{ w.id }}">{{ w.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="mb-3 adj-site-row" style="display:none;">
+                    <div class="mb-3" id="adjSiteRow" style="display:none;">
                         <label class="form-label">Project Site</label>
-                        <select name="adj_loc_id_site" class="form-select">
+                        <select id="adjSiteSel" class="form-select">
                             <option value="">— Select —</option>
                             {% for s in sites %}
                             <option value="{{ s.id }}">{{ s.name }}</option>
@@ -157,11 +159,6 @@
                         <input type="number" name="new_quantity" class="form-control" min="0" step="any" placeholder="Enter actual physical count" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Quantity to Adjust <span class="text-muted fw-normal">(used by system)</span></label>
-                        <input type="number" name="quantity" class="form-control" value="0" readonly style="background:#f8f9fa;">
-                        <div class="form-text">This field is computed automatically by the system.</div>
-                    </div>
-                    <div class="mb-3">
                         <label class="form-label">Reason <span class="text-muted fw-normal">(optional)</span></label>
                         <input type="text" name="notes" class="form-control" placeholder="e.g. physical count discrepancy">
                     </div>
@@ -171,6 +168,17 @@
                 </form>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="alert mt-4 d-flex align-items-start gap-3" style="background:#eff6ff;border:1px solid #bfdbfe;">
+    <i class="bi bi-info-circle-fill text-primary flex-shrink-0 mt-1"></i>
+    <div>
+        <strong>Note on Tools, Equipment &amp; Non-Consumables:</strong>
+        Quick Entry only handles <strong>consumable materials</strong> (cement, rebar, fuel, paint, etc.)
+        whose stock is measured by quantity. Tools and equipment are tracked individually by asset tag
+        and must be managed through their own workflow.
+        <a href="{{ url_for('main.item_list') }}" class="ms-2">Go to Items &amp; Assets →</a>
     </div>
 </div>
 
@@ -203,22 +211,38 @@
 
 {% block extra_js %}
 <script>
-document.querySelectorAll('.adj-loc-type').forEach(sel => {
-    sel.addEventListener('change', function(){
-        const card = this.closest('form');
-        const wRow = card.querySelector('.adj-warehouse-row');
-        const sRow = card.querySelector('.adj-site-row');
-        if (this.value === 'warehouse') { wRow.style.display=''; sRow.style.display='none'; }
-        else { wRow.style.display='none'; sRow.style.display=''; }
-    });
-});
+const adjLocType = document.getElementById('adjLocType');
+const adjWarehouseRow = document.getElementById('adjWarehouseRow');
+const adjSiteRow = document.getElementById('adjSiteRow');
+const adjWarehouseSel = document.getElementById('adjWarehouseSel');
+const adjSiteSel = document.getElementById('adjSiteSel');
+const adjLocId = document.getElementById('adjLocId');
 
-// Sync the hidden adj_loc_id for site selector
-document.querySelectorAll('.adj-site-row select').forEach(sel => {
-    sel.addEventListener('change', function(){
-        const wh = this.closest('form').querySelector('[name="adj_loc_id"]');
-        if (wh) wh.value = this.value;
+function syncAdjLocId() {
+    if (adjLocType.value === 'warehouse') {
+        adjLocId.value = adjWarehouseSel.value;
+    } else {
+        adjLocId.value = adjSiteSel.value;
+    }
+}
+
+if (adjLocType) {
+    adjLocType.addEventListener('change', function() {
+        if (this.value === 'warehouse') {
+            adjWarehouseRow.style.display = '';
+            adjSiteRow.style.display = 'none';
+        } else {
+            adjWarehouseRow.style.display = 'none';
+            adjSiteRow.style.display = '';
+        }
+        syncAdjLocId();
     });
-});
+    adjWarehouseSel.addEventListener('change', syncAdjLocId);
+    adjSiteSel.addEventListener('change', syncAdjLocId);
+
+    document.getElementById('adjForm').addEventListener('submit', function() {
+        syncAdjLocId();
+    });
+}
 </script>
 {% endblock %}

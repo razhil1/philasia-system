@@ -1825,14 +1825,14 @@ def category_overview():
     categories = Category.query.order_by(Category.name).all()
     cat_data = []
     for cat in categories:
-        items = Item.query.filter_by(category_id=cat.id, is_active=True).all()
-        total_items = len(items)
-        low_count = sum(1 for i in items if i.is_low_stock())
-        total_value = sum(float(i.unit_cost or 0) * i.total_stock() for i in items)
+        item_list = Item.query.filter_by(category_id=cat.id, is_active=True).all()
+        total_items = len(item_list)
+        low_count = sum(1 for i in item_list if i.is_low_stock())
+        total_value = sum(float(i.unit_cost or 0) * i.total_stock() for i in item_list)
         cat_data.append({
             'cat': cat, 'total_items': total_items,
             'low_count': low_count, 'total_value': total_value,
-            'items': items
+            'item_list': item_list
         })
     return render_template('inventory/category_overview.html', cat_data=cat_data)
 

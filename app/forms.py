@@ -220,7 +220,7 @@ class RequestItemForm(FlaskForm):
         super().__init__(*args, **kwargs)
         from app.models import Item
         self.item_id.choices = [(i.id, f"{i.name} [{i.sku}] \u2013 {i.unit}") for i in
-                                Item.query.filter_by(is_active=True).order_by('name').all()]
+                                Item.query.filter_by(is_active=True, item_type='consumable').order_by('name').all()]
 
 
 class ApproveRequestForm(FlaskForm):
