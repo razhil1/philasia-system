@@ -1,0 +1,103 @@
+Inventory Management System
+Overview
+
+This project is a movement-based inventory management system designed for companies managing warehouses and project sites. Its core purpose is to track all inventory changes through a comprehensive movement history, ensuring a complete and auditable trail. Stock quantities are always calculated from movement history rather than direct updates, guaranteeing data integrity. The system supports various business functions, including core inventory, LPG cylinder management, chemical trading/manufacturing, and project tracking.
+
+The system aims to provide a robust, secure, and user-friendly solution for complex inventory needs, enhancing operational efficiency and providing detailed insights through analytics and reporting.
+User Preferences
+
+Preferred communication style: Simple, everyday language.
+System Architecture
+UI/UX Decisions
+
+The frontend is built with React 19 and Vite 7, utilizing shadcn/ui (Radix UI primitives) with Tailwind CSS 4 for styling. It uses the "new-york" style variant with CSS variables for theming. Wouter is used for client-side routing, and TanStack Query manages server state with infinite stale time and no automatic refetching. Forms are handled by React Hook Form with Zod validation. Key design choices include strict TypeScript, path aliases, and custom fonts (Inter, JetBrains Mono, Oswald). The application is purely client-side with no SSR/RSC.
+Technical Implementations
+
+The backend is an Express.js application running on Node.js with TypeScript. It serves RESTful JSON APIs under the /api namespace. The client is built by Vite to dist/public, and the server is bundled by esbuild to dist/index.js as ESM. Development uses tsx for hot reloading. Request logging is implemented via custom middleware. WebSocket support is available for real-time updates.
+Feature Specifications
+
+The system supports multiple business modules:
+
+    Core Inventory Management: Dashboard, inventory tracking, product and location management, movement history, and quick operations. Supports product images, parent-child product relationships, and consumable/non-consumable types.
+    Project Management: Project lifecycle tracking, site details, progress tracking with percentage and billing, issued equipment management, and project services.
+    Specialized Business Functions:
+        LPG Cylinder Management: Serial number tracking with QR codes, customer management (external/internal), exchange workflows, deliveries, refill requests, and cylinder status tracking (FULL, EMPTY, IN-USE, EXCHANGED, DAMAGED).
+        Chemical Trading & Manufacturing (Cooker Module): Dashboard, chemical product and raw material inventory, batch/lot tracking, QC status, cooking reports, and trading-specific movements.
+    Administrative Functions: User management with role-based access control (8 roles), service catalog, user profiles, accounting, stock summary, equipment repair tracking, and login activity logs.
+
+User Roles: Admin, Project Manager, Cooker, Delivery Guy, Accounting, Finance Manager, Stock Clerk, Viewer.
+
+Authentication is session-based, utilizing connect-pg-simple for PostgreSQL-backed sessions and HTTP-only cookies. Security features include TOTP-based 2FA, location-based access control, login attempt tracking with device/IP/location logging, and bcrypt for password hashing.
+System Design Choices
+
+The core design pattern revolves around movement-based inventory: the inventory.quantity field is a calculated cache, with the true source of truth being the sum of all movements. This ensures a complete audit trail and prevents discrepancies. Movement types include:
+
+    DEL (Delivery)
+    TRANS (Transfer)
+    PULL (Pullout)
+    RET (Return)
+    ADJ (Adjustment)
+    LOAN
+    RETURN_LOAN
+    CONSUME
+    SCRAP
+
+The data flow involves the client making API requests via TanStack Query, which are validated by Express middleware against shared Zod schemas. A DatabaseStorage class executes Drizzle ORM queries against PostgreSQL, and responses are returned as JSON, cached client-side by TanStack Query. The database automatically seeds with mock data if empty during server startup.
+External Dependencies
+Database Service
+
+    Neon Serverless PostgreSQL: Managed PostgreSQL with a serverless driver.
+
+UI Component Libraries
+
+    Radix UI: Headless accessible components.
+    Lucide React: Icon library.
+    Recharts: Charting library for visualizations.
+    Embla Carousel: Carousel functionality.
+    CMDK: Command palette component.
+    Vaul: Drawer component.
+
+Additional Frontend Libraries
+
+    DnD Kit: Drag-and-drop functionality.
+    date-fns: Date manipulation and formatting.
+    html5-qrcode: QR code scanning.
+    ExcelJS: Excel import/export functionality.
+    Framer Motion: Animations and transitions.
+    PapaParse: CSV parsing.
+
+Build & Runtime Tools
+
+    Vite 7: Frontend build tool and development server.
+    esbuild: Backend bundling.
+    tsx: TypeScript execution for development.
+    ws: WebSocket library for real-time updates.
+
+Backend Libraries
+
+    Express: Web application framework.
+    express-session: Session management middleware.
+    connect-pg-simple: PostgreSQL session store.
+    passport: Authentication middleware.
+    passport-local: Local authentication strategy for Passport.js.
+    bcrypt: Password hashing library.
+    otpauth: TOTP implementation for 2FA.
+    multer: File upload handling for product images.
+    qrcode: QR code generation.
+
+Validation & Type Safety
+
+    Zod: Schema validation library.
+    drizzle-zod: Utility to convert Drizzle schemas to Zod.
+    zod-validation-error: For enhanced Zod error messages.
+    TypeScript: Ensures strict type checking across the full stack.
+
+Recent Changes
+
+    December 2025: Updated to React 19, Vite 7, Tailwind CSS 4
+    Added WebSocket support for real-time updates
+    Enhanced LPG module with refill requests feature
+    Added cooker reports and materials tracking
+    Improved project progress tracking with billing integration
+    Added product image upload support
+    Enhanced user login logging with device/location tracking

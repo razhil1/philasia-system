@@ -1,0 +1,466 @@
+TODO - Features, Logic & Architecture to Complete
+Priority Legend
+
+    🔴 Critical - Must have for system to function properly
+    🟠 High - Important for business operations
+    🟡 Medium - Nice to have, improves UX
+    🟢 Low - Future enhancement
+
+MENU & NAVIGATION ISSUES (URGENT)
+Missing Menu Items in Left Sidebar
+Priority	Menu Item	Path	Section Needed	Status
+🔴	User Management	/users	Admin Tools	✅ DONE (Dec 16, 2025)
+🔴	Parent Products	/parent-products	Warehouse Management	✅ DONE (Dec 16, 2025)
+🟠	LPG Refill Requests	/lpg-refill-requests	LPG Management	✅ DONE (Dec 16, 2025)
+🟡	Locations	/locations	Warehouse Management	Page exists, removed from menu
+Menu Structure Updates Needed
+
+    Add "Admin Tools" Section (visible only to admin role) - ✅ DONE
+        User Management (/users) - ✅ Added
+        System Settings - Pending
+        Audit Logs - Pending
+
+    Add missing items to Warehouse Management - ✅ DONE
+        Parent Products (/parent-products) - ✅ Added
+
+    Add missing items to LPG Management - ✅ DONE
+        Refill Requests (/lpg-refill-requests) - ✅ Added
+
+    Cooker Module Menu - Currently only has "Open Cooker Module"
+        Should show full menu items when in Cooker layout:
+            Dashboard (/cooker)
+            Submit Report (/cooker/reports)
+            Chemical Products (access to /trading/chemical-products)
+            Raw Materials (access to /trading/raw-materials)
+
+1. Core Inventory Module
+Features to Complete
+Priority	Feature	Description	Status
+🟠	Low Stock Alerts	Automatic notifications when stock falls below minStock threshold	✅ Done
+🟠	Stock Reconciliation	Periodic stock count verification against movement history	✅ Done (Dec 16, 2025)
+🟡	Barcode/QR Generation	Auto-generate barcodes for products without existing codes	Partial
+🟡	Batch Operations	Select multiple items for bulk transfer/adjustment	Partial
+🟡	Inventory Valuation	Calculate total inventory value based on product prices	✅ Done
+🟢	Expiry Tracking	Track expiry dates for consumable materials	Pending
+🟢	Reorder Suggestions	Auto-suggest reorder quantities based on usage patterns	Pending
+Logic to Implement
+
+    Movement Validation: Prevent negative stock quantities after movement ✅ (already implemented in adjustInventory + new validate-movement endpoint)
+    Stock Calculation: Real-time recalculation from movement history (currently cached)
+    Duplicate Detection: Warn when creating similar product names ✅ (new check-duplicate endpoint)
+    Unit Conversion: Handle different units of measure in transfers
+
+API Endpoints Implemented (Dec 16, 2025)
+
+GET  /api/inventory/low-stock              - ✅ Get items below minimum stock (with critical count)
+GET  /api/inventory/valuation              - ✅ Get total inventory value (by location & category)
+GET  /api/inventory/usage-report           - ✅ Usage analytics by date range, location, product
+POST /api/inventory/validate-movement      - ✅ Validate if movement would cause negative stock
+GET  /api/products/check-duplicate         - ✅ Check for duplicate/similar product names
+POST /api/inventory/reconcile              - ✅ Submit stock count for reconciliation (Dec 16, 2025)
+GET  /api/inventory/reconciliation-history - ✅ Get reconciliation audit history (Dec 16, 2025)
+
+2. Movement & Audit Trail
+Features to Complete
+Priority	Feature	Description	Status
+🟠	Movement Approval	Require manager approval for large movements	Pending
+🟠	Movement Reversal	Undo/reverse a movement with proper audit	Pending
+🟡	Movement Templates	Save common movement patterns for quick reuse	Pending
+🟡	Scheduled Movements	Schedule future transfers/deliveries	Pending
+🟢	Movement Attachments	Attach documents (DR, GP) to movements	Pending
+Logic to Implement
+
+    Reference Number Auto-increment: Ensure no duplicate DR/TF numbers (partially done)
+    Movement Chain Tracking: Link related movements (delivery → return)
+    Quantity Validation: Check source has sufficient stock before transfer
+    Location Type Validation: Enforce proper movement flows (Warehouse → Project Site)
+
+3. Project Management
+Features to Complete
+Priority	Feature	Description	Status
+🟠	Project Budget Tracking	Track actual vs budgeted costs	Pending
+🟠	Project Timeline	Gantt chart or timeline view	Pending
+🟡	Project Documents	Upload and manage project files	Pending
+🟡	Project Milestones	Define and track project milestones	Pending
+🟡	Material Requisition	Request materials for specific projects	Pending
+🟢	Project Templates	Create projects from templates	Pending
+Logic to Implement
+
+    Auto-calculate Progress: Derive progress from completed services/milestones
+    Project Cost Calculation: Sum of all materials used at project site
+    Project Completion Check: Verify all equipment returned before closing (partially done)
+    Multi-project Location: Allow multiple projects at same location
+
+Pages to Complete
+
+    Project Budget page with cost breakdown
+    Project Timeline/Gantt view
+    Project Reports page with analytics
+
+4. LPG Cylinder Management
+Features to Complete
+Priority	Feature	Description	Status
+🔴	Delivery Workflow	Complete delivery-out and return-empty flow	Partial
+🔴	Add Refill Requests to Menu	LPG Refill Requests page not accessible from menu	✅ DONE (Dec 16, 2025)
+🟠	Exchange Store Integration	Connect with 3rd party exchange stores	Partial
+🟠	Cylinder Lifecycle	Track cylinder age, maintenance history	Pending
+🟡	Customer Balance	Track cylinder deposit/balance per customer	Pending
+🟡	Route Optimization	Optimize delivery routes	Pending
+🟢	Customer Portal	Self-service portal for customers	Pending
+Logic to Implement
+
+    Cylinder Status Flow: Enforce valid status transitions (FULL → IN-USE → EMPTY)
+    Exchange Balance: Track discrepancy between out and in counts
+    Refill Request Fulfillment: Auto-assign cylinders to refill requests
+    Delivery Route Planning: Group deliveries by area
+
+Pages to Update
+Page	Issue	Status
+LPG Reports	PDF export shows "coming soon" alert	Needs Implementation
+LPG Refill Requests	Not in menu	Add to Menu
+API Endpoints Needed
+
+GET  /api/lpg/dashboard/stats          - LPG overview statistics
+POST /api/lpg/deliveries               - Create delivery transaction
+GET  /api/lpg/customers/:id/balance    - Get customer cylinder balance
+POST /api/lpg/cylinders/maintenance    - Log cylinder maintenance
+
+5. Trading & Chemical Manufacturing (Cooker Module)
+Features to Complete
+Priority	Feature	Description	Status
+🟠	Production Orders	Complete production order workflow	Partial
+🟠	Bill of Materials	Define raw materials needed per product	Pending
+🟠	Batch Costing	Calculate production cost per batch	Pending
+🟡	Quality Control	QC checkpoints and approval workflow	Partial
+🟡	Recipe Management	Define and version product recipes	Pending
+🟢	Production Scheduling	Plan and schedule production runs	Pending
+Logic to Implement
+
+    Material Deduction: Auto-deduct raw materials on production completion
+    Batch Traceability: Track which raw materials went into which batch
+    Yield Calculation: Compare expected vs actual production yield
+    Cost Rollup: Calculate product cost from raw material costs
+
+Pages to Complete
+
+    Bill of Materials management page
+    Production Order detail page
+    QC Inspection page
+    Recipe/Formula management page
+
+Cooker Module Issues
+Issue	Description	Priority
+Limited Menu	Cooker Layout only shows Dashboard and Submit Report	✅ FIXED (Dec 16, 2025)
+No Chemical Products access	Cooker users need to see chemical products inventory	✅ FIXED (Dec 16, 2025)
+No Raw Materials view	Cooker users need raw material stock visibility	✅ FIXED (Dec 16, 2025)
+6. User & Access Control
+Features to Complete
+Priority	Feature	Description	Status
+🔴	User Management Menu	User management page not accessible from sidebar	✅ DONE (Dec 16, 2025)
+🔴	Password Reset	Self-service password reset with email	✅ DONE (Dec 16, 2025) - API ready, admin can reset
+🟠	Role Permissions Matrix	Granular permission per role	Partial
+🟠	Session Management	View and revoke active sessions	Pending
+🟡	User Activity Log	Detailed user action audit trail	Partial
+🟡	Bulk User Import	Import users from CSV/Excel	Pending
+🟢	SSO Integration	OAuth/SAML single sign-on	Pending
+Logic to Implement
+
+    Permission Checks: Enforce role permissions on all API endpoints
+    Location-based Access: Restrict users to specific warehouse/site (partially done)
+    Password Policy: Enforce strong passwords, expiry
+    Account Lockout: Lock after N failed login attempts
+
+API Endpoints Needed
+
+POST /api/auth/forgot-password         - Request password reset
+POST /api/auth/reset-password          - Reset password with token
+GET  /api/auth/sessions                - List active sessions
+DELETE /api/auth/sessions/:id          - Revoke specific session
+
+7. Reporting & Analytics
+Features to Complete
+Priority	Feature	Description	Status
+🟠	Inventory Report	Comprehensive stock report with filters	Pending
+🟠	Movement Report	Detailed movement history with exports	Partial
+🟠	Project Report	Project status and cost summary	Pending
+🟡	Dashboard Customization	User-configurable dashboard widgets	Pending
+🟡	Scheduled Reports	Auto-generate and email reports	Pending
+🟢	Data Visualization	Advanced charts and graphs	Partial
+Reports to Build
+
+    Daily/Weekly/Monthly stock summary
+    Movement report by type, location, date range
+    Project cost analysis report
+    LPG delivery and exchange summary
+    User activity report
+    Low stock alert report
+
+Export Formats
+
+    Excel (ExcelJS) - Partial
+    PDF generation (LPG Reports shows "coming soon")
+    CSV export - Working
+
+8. Notifications & Alerts
+Features to Complete
+Priority	Feature	Description	Status
+🟠	Email Notifications	Send alerts via email	Pending
+🟠	In-app Notifications	Real-time notification center	Pending
+🟡	Push Notifications	Mobile push notifications	Pending
+🟡	SMS Alerts	Critical alerts via SMS	Pending
+🟢	Notification Preferences	User-customizable alerts	Partial (schema exists)
+Notification Types
+
+    Low stock alerts
+    Movement approvals needed
+    Project milestones reached
+    LPG delivery reminders
+    System announcements
+
+9. Architecture Improvements
+Backend
+Priority	Improvement	Description
+🔴	Error Handling	Centralized error handling middleware
+🔴	Input Validation	Validate all API inputs with Zod
+🟠	API Rate Limiting	Prevent abuse with rate limits
+🟠	Request Logging	Structured logging with levels
+🟠	Database Transactions	Wrap multi-table operations in transactions
+🟡	Caching Layer	Redis/memory cache for frequent queries
+🟡	Background Jobs	Queue for long-running tasks
+Frontend
+Priority	Improvement	Description
+🟠	Error Boundaries	Graceful error handling in React
+🟠	Loading States	Consistent loading indicators
+🟠	Offline Support	Basic offline functionality
+🟡	Performance Optimization	Code splitting, lazy loading
+🟡	Accessibility	WCAG compliance improvements
+🟢	PWA Support	Progressive Web App features
+Database
+Priority	Improvement	Description
+🟠	Indexes	Add indexes for frequently queried columns
+🟠	Soft Deletes	Implement soft delete for audit trail
+🟡	Database Backups	Automated backup strategy
+🟢	Data Archiving	Archive old movements/history
+10. Security Enhancements
+Priority	Feature	Description	Status
+🔴	HTTPS Only	Force HTTPS in production	Replit handles
+🔴	CSRF Protection	Add CSRF tokens to forms	Pending
+🟠	SQL Injection Prevention	Use parameterized queries	Done (Drizzle ORM)
+🟠	XSS Prevention	Sanitize user inputs	Partial
+🟠	Session Security	Secure cookie settings	Partial
+🟡	Audit Logging	Log all sensitive operations	Partial
+🟢	Penetration Testing	Security assessment	Pending
+11. Integration Points
+External Systems to Integrate
+Priority	Integration	Description	Status
+🟡	Accounting Software	Export to QuickBooks/Xero	Pending
+🟡	Email Service	SendGrid/Mailgun for notifications	Pending
+🟡	SMS Gateway	Twilio for SMS alerts	Pending
+🟢	ERP System	Connect with existing ERP	Pending
+🟢	Mobile App	Native mobile app (React Native)	Pending
+12. Testing & Quality
+Priority	Task	Description	Status
+🔴	Unit Tests	Test critical business logic	Pending
+🟠	Integration Tests	API endpoint testing	Pending
+🟠	E2E Tests	End-to-end workflow tests	Pending
+🟡	Performance Tests	Load testing for scaling	Pending
+PAGE-BY-PAGE STATUS
+Core Pages
+Page	Route	Status	Issues
+Dashboard	/	✅ Working	-
+Inventory	/inventory	✅ Working	-
+Operations	/operations	✅ Working	-
+Operation Detail	/operations/:reference	✅ Working	-
+Movement History	/movements	✅ Working	-
+Stock Summary	/stock-summary	✅ Working	-
+QR Scanner	/qr-scanner	✅ Working	-
+QR Labels	/qr-labels	✅ Working	-
+Issued To Person	/issued-to-person	✅ Working	-
+Repair Management	/repair	✅ Working	-
+Project Pages
+Page	Route	Status	Issues
+Services List	/services	✅ Working	-
+Projects	/projects	✅ Working	Budget tracking pending
+Project Sites	/project-sites	✅ Working	-
+Project Site Detail	/project-sites/:id	✅ Working	-
+Progress Reports	/project-progress	✅ Working	-
+Trading Pages
+Page	Route	Status	Issues
+Trading Dashboard	/trading/dashboard	✅ Working	-
+Chemical Products	/trading/chemical-products	✅ Working	-
+Raw Materials	/trading/raw-materials	✅ Working	-
+Trading Operations	/trading/operations	✅ Working	-
+Trading Customers	/trading/customers	✅ Working	-
+Trading Movements	/trading/movements	✅ Working	-
+Trading History	/trading/history	✅ Working	-
+LPG Pages
+Page	Route	Status	Issues
+LPG Dashboard	/lpg/dashboard	✅ Working	-
+LPG Cylinders	/lpg/cylinders	✅ Working	-
+LPG Exchange	/lpg/exchange	✅ Working	-
+LPG Customers	/lpg/customers	✅ Working	-
+LPG Movements	/lpg/movements	✅ Working	-
+LPG Deliveries	/lpg/deliveries	✅ Working	-
+LPG Reports	/lpg/reports	⚠️ Partial	PDF export not implemented
+LPG Refill Requests	/lpg-refill-requests	✅ Working	Added to LPG Management menu (Dec 16, 2025)
+Cooker Pages
+Page	Route	Status	Issues
+Cooker Dashboard	/cooker	✅ Working	Limited menu in Cooker layout
+Cooker Reports	/cooker/reports	✅ Working	-
+Admin/User Pages
+Page	Route	Status	Issues
+User Management	/users	✅ Working	Added to Admin Tools menu (Dec 16, 2025)
+Profile	/profile	✅ Working	-
+Parent Products	/parent-products	✅ Working	Added to Warehouse Management menu (Dec 16, 2025)
+Parent Product Detail	/parent-products/:id	✅ Working	-
+Placeholder Pages
+Page	Route	Status	Notes
+Accounting	/accounting	🚧 Placeholder	"Coming Soon" page, needs full implementation
+Locations	/locations	Exists	Removed from menu, may need re-evaluation
+Quick Wins (Can implement quickly)
+
+    ✅ Add data-testid attributes to all interactive elements (Done)
+    Add confirmation dialogs before destructive actions (Mostly done)
+    Improve error messages for API failures
+    Add search/filter to all list pages
+    Add pagination for large datasets
+    Implement proper loading skeletons
+    Add keyboard shortcuts for power users
+
+Menu Updates Needed (mockData.ts)
+Add to MENU_SECTIONS:
+
+// Add Admin Tools section (admin only)
+{
+  section: "Admin Tools",
+  items: [
+    { label: "User Management", icon: Users, path: "/users" },
+  ]
+}
+// Add to Warehouse Management
+{ label: "Parent Products", icon: Boxes, path: "/parent-products" },
+// Add to LPG Management
+{ label: "Refill Requests", icon: ClipboardList, path: "/lpg-refill-requests" },
+
+Update rolePermissions.ts:
+
+    Add "Admin Tools" to admin menuSections
+    Add /parent-products route to appropriate roles
+
+Technical Debt
+
+    Refactor storage.ts into separate service files by domain
+    Move business logic from routes.ts to service layer
+    Standardize API response format
+    Remove unused imports and dead code
+    Add TypeScript strict mode
+    Update deprecated dependencies
+    Improve code documentation
+    Fix LSP errors in lpg/Reports.tsx and Dashboard.tsx ✅ (Dec 16, 2025)
+
+Database Schema Changes Needed
+New Tables
+
+-- Notifications table
+CREATE TABLE notifications (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(255) REFERENCES users(id),
+  type VARCHAR(50) NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT,
+  read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+-- Bill of Materials
+CREATE TABLE bill_of_materials (
+  id SERIAL PRIMARY KEY,
+  product_id INTEGER REFERENCES trading_chemical_products(id),
+  raw_material_id INTEGER REFERENCES trading_raw_materials(id),
+  quantity INTEGER NOT NULL,
+  unit TEXT NOT NULL
+);
+-- Project Milestones
+CREATE TABLE project_milestones (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER REFERENCES projects(id),
+  title TEXT NOT NULL,
+  due_date DATE,
+  completed_date DATE,
+  status TEXT DEFAULT 'Pending'
+);
+
+Schema Modifications
+
+    Add deleted_at column to tables for soft deletes
+    Add approved_by and approved_at to movements table
+    Add expiry_date to products table for consumables
+    Add deposit_amount to lpg_customers table
+
+Implementation Order (Suggested)
+Phase 1: Menu & Navigation Fixes (IMMEDIATE) - ✅ COMPLETED (Dec 16, 2025)
+
+    ✅ Add User Management to admin menu - DONE
+    ✅ Add Parent Products to Warehouse Management menu - DONE
+    ✅ Add LPG Refill Requests to LPG Management menu - DONE
+    ✅ Fix Cooker Module menu items - DONE (Dec 16, 2025)
+
+Phase 2: Core Stability (Week 1-2) - IN PROGRESS
+
+    ✅ Complete movement validation and error handling - DONE (validate-movement endpoint exists)
+    ✅ Implement low stock alerts - DONE (low-stock endpoint exists)
+    ✅ Add proper loading states and error messages - DONE (PageLoader component added)
+    ✅ Stock Reconciliation - DONE (reconcile endpoint added Dec 16, 2025)
+    ✅ Password Reset - DONE (forgot-password, reset-password endpoints added Dec 16, 2025)
+    Complete role-based permission checks - Partial
+
+Phase 3: Business Features (Week 3-4)
+
+    Complete LPG delivery workflow
+    Implement project budget tracking
+    Build comprehensive reports (including PDF export)
+    Add email notifications
+
+Phase 4: Advanced Features (Week 5-6)
+
+    Trading module completion
+    Production order workflow
+    Bill of materials
+    Advanced analytics
+
+Phase 5: Polish & Scale (Week 7-8)
+
+    Performance optimization
+    Testing suite
+    Security hardening
+    Documentation
+
+Change Log
+December 16, 2025 - Menu & Navigation Update
+
+    ✅ Added User Management to Admin Tools section in sidebar
+    ✅ Added Parent Products to Warehouse Management section in sidebar
+    ✅ Added LPG Refill Requests to LPG Management section in sidebar
+    ✅ Updated role permissions for admin to include Admin Tools
+    ✅ Fixed LSP error in lpg/Reports.tsx (removed unused recharts Table import)
+    ✅ Fixed LSP error in Dashboard.tsx (corrected ImportDialog props)
+
+December 16, 2025 - Core Features Update (Session 2)
+
+    ✅ Cooker Module Menu Enhancement: Added Chemical Products, Raw Materials, Trading Operations, and Trading Movements to Cooker layout sidebar
+    ✅ Stock Reconciliation API: Added POST /api/inventory/reconcile endpoint for physical stock count verification and automatic adjustment
+    ✅ Reconciliation History API: Added GET /api/inventory/reconciliation-history endpoint for audit trail
+    ✅ Password Reset APIs:
+        Added POST /api/auth/forgot-password for password reset request
+        Added POST /api/auth/reset-password for token-based password reset
+        Added POST /api/auth/admin-reset-password for admin to reset user passwords
+    ✅ Loading Components: Added PageLoader, TableSkeleton, CardSkeleton reusable components for consistent loading states
+
+API Endpoints Added (Dec 16, 2025 - Session 2)
+
+POST /api/inventory/reconcile              - Submit physical stock count for reconciliation
+GET  /api/inventory/reconciliation-history - Get reconciliation audit history
+POST /api/auth/forgot-password             - Request password reset
+POST /api/auth/reset-password              - Reset password with token
+POST /api/auth/admin-reset-password        - Admin reset user password
+
+Last Updated: December 16, 2025
