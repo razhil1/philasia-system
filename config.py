@@ -6,3 +6,4 @@ class Config:
         'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app/static/uploads')
+    BACKUP_DIR = os.environ.get('BACKUP_DIR') or os.path.join(os.path.abspath(os.path.dirname(__file__)), 'backups')

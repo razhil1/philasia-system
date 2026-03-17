@@ -2,196 +2,353 @@
 {% block title %}Dashboard{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 
+{% block extra_css %}
+<style>
+.col-xl-2-4 { flex: 0 0 auto; width: 20%; }
+@media(max-width:1200px){.col-xl-2-4{width:33.333%}}
+@media(max-width:768px){.col-xl-2-4{width:50%}}
+.stat-card { border-radius:14px; padding:1.2rem 1.25rem; background:#fff; border:1px solid var(--border); transition:box-shadow .2s; position:relative; overflow:hidden; }
+.stat-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.07); }
+.stat-card .stat-bg { position:absolute; right:-10px; bottom:-10px; font-size:4rem; opacity:.05; }
+.stat-card .stat-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; margin-bottom:.6rem; }
+.stat-card .stat-num { font-size:1.8rem; font-weight:800; line-height:1.1; }
+.stat-card .stat-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-top:.2rem; }
+.stat-card .stat-sub { font-size:.75rem; color:var(--muted); margin-top:.3rem; }
+.section-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:.75rem; }
+.move-row-link { text-decoration:none; color:inherit; display:table-row; }
+.move-row-link:hover td { background:#f8fafc; }
+.val-display { font-size:1.9rem; font-weight:800; letter-spacing:-.02em; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-end">
-    <div>
-        <h1>Operations Dashboard</h1>
-        <p>{{ now.strftime('%A, %B %d, %Y') }}</p>
-    </div>
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('main.movement_create') }}" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg me-1"></i>Post Movement
-        </a>
-        <a href="{{ url_for('main.request_create') }}" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-clipboard2-plus me-1"></i>New Requisition
-        </a>
-    </div>
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-end mb-4">
+  <div>
+    <h1 class="mb-0 fw-bold" style="font-size:1.5rem;">Operations Dashboard</h1>
+    <p class="text-muted mb-0 mt-1" style="font-size:.85rem;">
+      <i class="bi bi-calendar3 me-1"></i>{{ now.strftime('%A, %B %d, %Y') }}
+      &nbsp;·&nbsp;
+      <i class="bi bi-clock me-1"></i>{{ now.strftime('%I:%M %p') }}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('main.vendor_input') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-truck me-1"></i>Vendor Input
+    </a>
+    <a href="{{ url_for('main.movement_create') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Post Movement
+    </a>
+  </div>
 </div>
 
-<!-- Stat Cards -->
+<!-- KPI Row 1 -->
+<div class="row g-3 mb-3">
+  <div class="col-xl-2-4 col-sm-6">
+    <div class="stat-card">
+      <i class="bi bi-boxes stat-bg text-primary"></i>
+      <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-box-seam"></i></div>
+      <div class="stat-num text-primary">{{ total_items }}</div>
+      <div class="stat-label">Active Items</div>
+      <div class="stat-sub">{{ consumable_items }} consumable · {{ asset_items }} asset</div>
+    </div>
+  </div>
+  <div class="col-xl-2-4 col-sm-6">
+    <div class="stat-card">
+      <i class="bi bi-currency-dollar stat-bg text-success"></i>
+      <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-currency-dollar"></i></div>
+      <div class="stat-num text-success" style="font-size:1.4rem;">₱{{ "{:,.0f}".format(total_inventory_value) }}</div>
+      <div class="stat-label">Total Inventory Value</div>
+      <div class="stat-sub">All warehouses &amp; sites</div>
+    </div>
+  </div>
+  <div class="col-xl-2-4 col-sm-6">
+    <div class="stat-card">
+      <i class="bi bi-tools stat-bg text-purple"></i>
+      <div class="stat-icon" style="background:#f3f0ff;color:#7c3aed;"><i class="bi bi-tools"></i></div>
+      <div class="stat-num" style="color:#7c3aed;">{{ total_asset_units }}</div>
+      <div class="stat-label">Asset Units</div>
+      <div class="stat-sub">{{ deployed_assets }} deployed · {{ available_assets }} available</div>
+    </div>
+  </div>
+  <div class="col-xl-2-4 col-sm-6">
+    <div class="stat-card">
+      <i class="bi bi-geo-alt stat-bg text-info"></i>
+      <div class="stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-geo-alt"></i></div>
+      <div class="stat-num text-info">{{ active_projects }}</div>
+      <div class="stat-label">Active Sites</div>
+      <div class="stat-sub">{{ total_sites }} total project sites</div>
+    </div>
+  </div>
+  <div class="col-xl-2-4 col-sm-6">
+    <div class="stat-card">
+      <i class="bi bi-arrow-left-right stat-bg text-warning"></i>
+      <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-arrow-left-right"></i></div>
+      <div class="stat-num text-warning">{{ total_movements_month }}</div>
+      <div class="stat-label">Movements This Month</div>
+      <div class="stat-sub">{{ total_movements_today }} today</div>
+    </div>
+  </div>
+</div>
+
+<!-- KPI Row 2 (secondary) -->
 <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-xl-2-4">
-        <div class="stat-card">
-            <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-box-seam"></i></div>
-            <div class="stat-num text-primary">{{ total_items }}</div>
-            <div class="stat-label">Active Items</div>
-        </div>
+  <div class="col-sm-4">
+    <div class="card py-2 px-3 d-flex flex-row align-items-center gap-3">
+      <div class="stat-icon bg-warning bg-opacity-10 text-warning flex-shrink-0"><i class="bi bi-clipboard2-check"></i></div>
+      <div>
+        <div class="fw-bold fs-5 text-warning">{{ pending_requests }}</div>
+        <div class="text-muted" style="font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Pending Requisitions</div>
+      </div>
+      <a href="{{ url_for('main.request_list') }}" class="btn btn-sm btn-outline-warning ms-auto">Review</a>
     </div>
-    <div class="col-sm-6 col-xl-2-4">
-        <div class="stat-card">
-            <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-geo-alt"></i></div>
-            <div class="stat-num text-success">{{ active_projects }}</div>
-            <div class="stat-label">Active Sites</div>
-        </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card py-2 px-3 d-flex flex-row align-items-center gap-3">
+      <div class="stat-icon bg-danger bg-opacity-10 text-danger flex-shrink-0"><i class="bi bi-exclamation-triangle"></i></div>
+      <div>
+        <div class="fw-bold fs-5 text-danger">{{ low_stock_items|length }}</div>
+        <div class="text-muted" style="font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Low Stock Alerts</div>
+      </div>
+      <a href="{{ url_for('main.report_low_stock') }}" class="btn btn-sm btn-outline-danger ms-auto">View</a>
     </div>
-    <div class="col-sm-6 col-xl-2-4">
-        <div class="stat-card">
-            <div class="stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-building"></i></div>
-            <div class="stat-num text-info">{{ total_warehouses }}</div>
-            <div class="stat-label">Warehouses</div>
-        </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card py-2 px-3 d-flex flex-row align-items-center gap-3">
+      <div class="stat-icon flex-shrink-0" style="background:#fef3c7;color:#d97706;"><i class="bi bi-tools"></i></div>
+      <div>
+        <div class="fw-bold fs-5" style="color:#d97706;">{{ maintenance_assets }}</div>
+        <div class="text-muted" style="font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Units Under Maintenance</div>
+      </div>
+      <a href="{{ url_for('main.item_list') }}?type=asset" class="btn btn-sm btn-outline-secondary ms-auto">Assets</a>
     </div>
-    <div class="col-sm-6 col-xl-2-4">
-        <div class="stat-card">
-            <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-clipboard2-check"></i></div>
-            <div class="stat-num text-warning">{{ pending_requests }}</div>
-            <div class="stat-label">Pending Requests</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-2-4">
-        <div class="stat-card">
-            <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-triangle"></i></div>
-            <div class="stat-num text-danger">{{ low_stock_items|length }}</div>
-            <div class="stat-label">Low Stock Alerts</div>
-        </div>
-    </div>
+  </div>
 </div>
 
-<style>.col-xl-2-4 { flex: 0 0 auto; width: 20%; } @media(max-width:1200px){.col-xl-2-4{width:50%}}</style>
+<!-- Charts Row -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-bar-chart-line me-2 text-primary"></i>Movement Activity — Last 14 Days</span>
+        <a href="{{ url_for('main.report_movements') }}" class="btn btn-sm btn-outline-secondary">Full Log</a>
+      </div>
+      <div class="card-body p-3">
+        <canvas id="movChart" style="max-height:240px;"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-pie-chart me-2 text-primary"></i>Movement Types (30 days)</div>
+      <div class="card-body d-flex align-items-center justify-content-center p-3">
+        {% if mv_type_counts %}
+        <canvas id="typeChart" style="max-height:220px;max-width:220px;"></canvas>
+        {% else %}
+        <div class="text-center text-muted"><i class="bi bi-pie-chart fs-1 opacity-25 d-block mb-2"></i>No data yet</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
 
+<!-- Warehouse Stock + Low Stock -->
+<div class="row g-4 mb-4">
+  {% if wh_stock %}
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-building me-2 text-primary"></i>Warehouse Stock Value</div>
+      <div class="card-body p-3">
+        <canvas id="whChart" style="max-height:220px;"></canvas>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  <div class="col-lg-{{ '7' if wh_stock else '12' }}">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-triangle text-danger me-2"></i>Low Stock Alerts</span>
+        <a href="{{ url_for('main.report_low_stock') }}" class="btn btn-sm btn-outline-secondary">Full Report</a>
+      </div>
+      {% if low_stock_items %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Item</th><th>Current Stock</th><th>Min Level</th><th>Deficit</th></tr></thead>
+          <tbody>
+          {% for al in low_stock_items %}
+          <tr>
+            <td>
+              <a href="{{ url_for('main.item_detail', item_id=al.item.id) }}" class="fw-semibold text-decoration-none">{{ al.item.name }}</a>
+              <div class="text-muted" style="font-size:.75rem;">{{ al.item.sku }}</div>
+            </td>
+            <td>
+              <span class="fw-bold text-danger">{{ al.current_qty | round(1) }}</span>
+              <span class="text-muted small">{{ al.item.unit }}</span>
+            </td>
+            <td class="text-muted">{{ al.item.reorder_level }}</td>
+            <td>
+              {% set deficit = (al.item.reorder_level | float) - al.current_qty %}
+              <span class="badge" style="background:#fee2e2;color:#b91c1c;">-{{ deficit | round(1) }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-center py-4 text-muted">
+        <i class="bi bi-check-circle text-success fs-1 d-block mb-2"></i>
+        <div class="fw-semibold">All items above reorder threshold</div>
+        <div class="small mt-1">Stock levels are healthy.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Recent Activity -->
 <div class="row g-4">
-    <!-- Chart -->
-    <div class="col-lg-7">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Movement Activity — Last 7 Days</span>
-                <a href="{{ url_for('main.report_movements') }}" class="btn btn-sm btn-outline-secondary">View All</a>
-            </div>
-            <div class="card-body p-3">
-                <canvas id="movChart" style="max-height:260px;"></canvas>
-            </div>
-        </div>
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history me-2 text-primary"></i>Recent Movements</span>
+        <a href="{{ url_for('main.movement_list') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      {% if recent_movements %}
+      <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+          <thead><tr><th>Type</th><th>Item</th><th>Qty</th><th>From → To</th><th>Date</th><th>By</th></tr></thead>
+          <tbody>
+          {% for m in recent_movements %}
+          <tr style="cursor:pointer;" onclick="location.href='{{ url_for('main.movement_detail', mov_id=m.id) }}'">
+            <td><span class="badge move-{{ m.movement_type }}">{{ m.type_label }}</span></td>
+            <td class="fw-semibold">{{ m.item.name }}</td>
+            <td>{{ m.quantity }} <span class="text-muted small">{{ m.item.unit }}</span></td>
+            <td class="text-muted small">{{ m.from_location_name() }} → {{ m.to_location_name() }}</td>
+            <td class="text-muted small" style="white-space:nowrap;">{{ m.date.strftime('%b %d, %H:%M') }}</td>
+            <td class="text-muted small">{{ m.created_by.username }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-center text-muted py-4">No movements recorded yet.</div>
+      {% endif %}
     </div>
+  </div>
 
-    <!-- Low Stock -->
-    <div class="col-lg-5">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-exclamation-triangle text-warning me-1"></i>Low Stock Alerts</span>
-                <a href="{{ url_for('main.report_low_stock') }}" class="btn btn-sm btn-outline-secondary">Full Report</a>
-            </div>
-            <div class="card-body p-0">
-                {% if low_stock_items %}
-                <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead><tr><th>Item</th><th>Stock</th><th>Min</th></tr></thead>
-                    <tbody>
-                    {% for al in low_stock_items %}
-                    <tr>
-                        <td><a href="{{ url_for('main.item_detail', item_id=al.item.id) }}" class="fw-semibold text-decoration-none">{{ al.item.name }}</a><br><small class="text-muted">{{ al.item.sku }}</small></td>
-                        <td class="text-danger fw-bold">{{ al.current_qty | round(1) }} {{ al.item.unit }}</td>
-                        <td class="text-muted">{{ al.item.reorder_level }}</td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-                </div>
-                {% else %}
-                <div class="p-4 text-center text-muted"><i class="bi bi-check-circle text-success fs-2 d-block mb-2"></i>All items above threshold</div>
-                {% endif %}
-            </div>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clipboard2-check me-2 text-primary"></i>Requisitions</span>
+        <a href="{{ url_for('main.request_list') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      {% if recent_requests %}
+      <div class="list-group list-group-flush">
+      {% for r in recent_requests %}
+      <a href="{{ url_for('main.request_detail', req_id=r.id) }}" class="list-group-item list-group-item-action py-2 px-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="fw-semibold small">REQ-{{ '%04d'|format(r.id) }}</span>
+          <span class="badge status-{{ r.status }}">{{ r.status.replace('_',' ').title() }}</span>
         </div>
-    </div>
-
-    <!-- Recent Movements -->
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Recent Movements</span>
-                <a href="{{ url_for('main.movement_list') }}" class="btn btn-sm btn-outline-secondary">View All</a>
-            </div>
-            <div class="card-body p-0">
-                {% if recent_movements %}
-                <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead><tr><th>Type</th><th>Item</th><th>Qty</th><th>From → To</th><th>Date</th><th>By</th></tr></thead>
-                    <tbody>
-                    {% for m in recent_movements %}
-                    <tr>
-                        <td><span class="badge move-{{ m.movement_type }}">{{ m.type_label }}</span></td>
-                        <td class="fw-semibold">{{ m.item.name }}</td>
-                        <td>{{ m.quantity }} {{ m.item.unit }}</td>
-                        <td class="text-muted small">{{ m.from_location_name() }} → {{ m.to_location_name() }}</td>
-                        <td class="text-muted small">{{ m.date.strftime('%b %d, %H:%M') }}</td>
-                        <td class="text-muted small">{{ m.created_by.username }}</td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-                </div>
-                {% else %}
-                <div class="p-4 text-center text-muted">No movements recorded yet.</div>
-                {% endif %}
-            </div>
+        <div class="d-flex justify-content-between mt-1">
+          <span class="text-muted" style="font-size:.77rem;">{{ r.site.name }}</span>
+          <span class="text-muted" style="font-size:.77rem;">{{ r.created_at.strftime('%b %d') }}</span>
         </div>
+      </a>
+      {% endfor %}
+      </div>
+      {% else %}
+      <div class="card-body text-center text-muted py-4">No requisitions yet.</div>
+      {% endif %}
     </div>
-
-    <!-- Recent Requisitions -->
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Recent Requisitions</span>
-                <a href="{{ url_for('main.request_list') }}" class="btn btn-sm btn-outline-secondary">View All</a>
-            </div>
-            <div class="card-body p-0">
-                {% if recent_requests %}
-                <div class="list-group list-group-flush">
-                {% for r in recent_requests %}
-                <a href="{{ url_for('main.request_detail', req_id=r.id) }}" class="list-group-item list-group-item-action py-2 px-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold small">REQ-{{ '%04d'|format(r.id) }}</span>
-                        <span class="badge status-{{ r.status }}">{{ r.status.title() }}</span>
-                    </div>
-                    <div class="text-muted" style="font-size:.78rem;">{{ r.site.name }} · {{ r.created_at.strftime('%b %d') }}</div>
-                </a>
-                {% endfor %}
-                </div>
-                {% else %}
-                <div class="p-4 text-center text-muted">No requisitions yet.</div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-const ctx = document.getElementById('movChart');
-new Chart(ctx, {
-    type: 'bar',
-    data: {
-        labels: {{ chart_labels | tojson }},
-        datasets: [{
-            label: 'Inflow',
-            data: {{ chart_inflow | tojson }},
-            backgroundColor: 'rgba(16,185,129,.65)',
-            borderRadius: 4
-        }, {
-            label: 'Outflow',
-            data: {{ chart_outflow | tojson }},
-            backgroundColor: 'rgba(26,111,212,.65)',
-            borderRadius: 4
-        }]
+// Movement Activity Chart
+const movCtx = document.getElementById('movChart');
+new Chart(movCtx, {
+  type: 'bar',
+  data: {
+    labels: {{ chart_labels | tojson }},
+    datasets: [{
+      label: 'Inflow (Deliveries/Returns)',
+      data: {{ chart_inflow | tojson }},
+      backgroundColor: 'rgba(16,185,129,.7)',
+      borderRadius: 4, borderSkipped: false,
+    }, {
+      label: 'Outflow (Transfers/Consumption)',
+      data: {{ chart_outflow | tojson }},
+      backgroundColor: 'rgba(26,111,212,.7)',
+      borderRadius: 4, borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position:'top', align:'end', labels: { font:{family:'Inter',size:11}, boxWidth:10, usePointStyle:true } },
+      tooltip: { mode:'index', intersect:false }
     },
-    options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'top', align: 'end', labels: { font: { family: 'Inter', size: 12 }, boxWidth: 10, usePointStyle: true } } },
-        scales: {
-            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'Inter', size: 11 } } },
-            x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 } } }
-        }
+    scales: {
+      y: { beginAtZero:true, stacked:false, grid:{color:'#f1f5f9'}, ticks:{font:{family:'Inter',size:10}} },
+      x: { grid:{display:false}, ticks:{font:{family:'Inter',size:10}, maxRotation:45} }
     }
+  }
 });
+
+// Movement Type Donut
+{% if mv_type_counts %}
+const typeCtx = document.getElementById('typeChart');
+const colors = ['#1a6fd4','#10b981','#f59e0b','#ef4444','#7c3aed','#06b6d4','#f97316'];
+new Chart(typeCtx, {
+  type: 'doughnut',
+  data: {
+    labels: {{ mv_type_labels | tojson }},
+    datasets: [{ data: {{ mv_type_counts | tojson }}, backgroundColor: colors, borderWidth:2, borderColor:'#fff' }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position:'bottom', labels:{font:{family:'Inter',size:10},boxWidth:10,padding:8} }
+    },
+    cutout: '65%'
+  }
+});
+{% endif %}
+
+// Warehouse Stock Chart
+{% if wh_stock %}
+const whCtx = document.getElementById('whChart');
+new Chart(whCtx, {
+  type: 'bar',
+  data: {
+    labels: {{ wh_stock | map(attribute='name') | list | tojson }},
+    datasets: [{
+      label: 'Stock Value (₱)',
+      data: {{ wh_stock | map(attribute='value') | list | tojson }},
+      backgroundColor: ['#1a6fd4','#10b981','#f59e0b','#7c3aed','#ef4444'],
+      borderRadius: 6, borderSkipped: false,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display:false },
+      tooltip: {
+        callbacks: { label: ctx => ' ₱' + ctx.raw.toLocaleString('en-PH', {minimumFractionDigits:2}) }
+      }
+    },
+    scales: {
+      x: { beginAtZero:true, grid:{color:'#f1f5f9'}, ticks:{font:{family:'Inter',size:10}, callback:v=>'₱'+v.toLocaleString()} },
+      y: { grid:{display:false}, ticks:{font:{family:'Inter',size:10}} }
+    }
+  }
+});
+{% endif %}
 </script>
 {% endblock %}

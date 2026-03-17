@@ -223,8 +223,13 @@
     {% if current_user.can('manage_users') %}
     <div class="sidebar-section">Admin</div>
     <div class="nav-item-s">
-        <a href="{{ url_for('main.user_list') }}" class="{{ 'active' if 'user' in (request.endpoint or '') and request.endpoint != 'main.profile' }}">
+        <a href="{{ url_for('main.user_list') }}" class="{{ 'active' if 'user' in (request.endpoint or '') and request.endpoint not in ('main.profile','main.backup_page') }}">
             <i class="bi bi-people"></i> User Management
+        </a>
+    </div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.backup_page') }}" class="{{ 'active' if request.endpoint == 'main.backup_page' }}">
+            <i class="bi bi-shield-check"></i> Backup & Restore
         </a>
     </div>
     {% endif %}

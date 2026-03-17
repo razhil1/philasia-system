@@ -56,27 +56,44 @@ def _update_stock(item_id, location_type, warehouse_id, site_id, delta):
 @login_required
 def dashboard():
     total_items = Item.query.filter_by(is_active=True).count()
+    consumable_items = Item.query.filter_by(is_active=True, item_type='consumable').count()
+    asset_items = Item.query.filter_by(is_active=True, item_type='asset').count()
     total_warehouses = Warehouse.query.filter_by(is_active=True).count()
     total_sites = ProjectSite.query.count()
     active_projects = ProjectSite.query.filter_by(status='active').count()
     pending_requests = Request.query.filter_by(status='pending').count()
     total_movements_today = Movement.query.filter(
         func.date(Movement.date) == date.today()).count()
+    month_start = date.today().replace(day=1)
+    total_movements_month = Movement.query.filter(
+        func.date(Movement.date) >= month_start).count()
 
-    recent_movements = Movement.query.order_by(desc(Movement.date)).limit(8).all()
-    recent_requests = Request.query.order_by(desc(Request.created_at)).limit(5).all()
+    # Inventory value (all stock × unit_cost)
+    total_inventory_value = db.session.query(
+        func.sum(Stock.quantity * Item.unit_cost)
+    ).join(Item, Stock.item_id == Item.id).scalar() or 0
+
+    # Asset unit counts
+    total_asset_units = AssetUnit.query.count()
+    deployed_assets = AssetUnit.query.filter_by(status='deployed').count()
+    available_assets = AssetUnit.query.filter_by(status='available').count()
+    maintenance_assets = AssetUnit.query.filter_by(status='maintenance').count()
+
+    recent_movements = Movement.query.order_by(desc(Movement.date)).limit(10).all()
+    recent_requests = Request.query.order_by(desc(Request.created_at)).limit(6).all()
 
     low_stock_items = []
-    for item in Item.query.filter_by(is_active=True).all():
+    for item in Item.query.filter_by(is_active=True, item_type='consumable').all():
         total_qty = item.total_stock()
         if total_qty < float(item.reorder_level or 0):
             low_stock_items.append({'item': item, 'current_qty': total_qty})
+    low_stock_items.sort(key=lambda x: x['current_qty'])
 
-    # Chart data: movements per day last 7 days
+    # Chart data: movements per day last 14 days
     chart_labels = []
     chart_inflow = []
     chart_outflow = []
-    for i in range(6, -1, -1):
+    for i in range(13, -1, -1):
         d = date.today() - timedelta(days=i)
         chart_labels.append(d.strftime('%b %d'))
         inflow_types = ['delivery', 'return', 'pullout']
@@ -90,14 +107,37 @@ def dashboard():
         chart_inflow.append(float(inflow))
         chart_outflow.append(float(outflow))
 
+    # Movement type breakdown (last 30 days)
+    thirty_days_ago = date.today() - timedelta(days=30)
+    type_breakdown = db.session.query(
+        Movement.movement_type, func.count(Movement.id)
+    ).filter(func.date(Movement.date) >= thirty_days_ago).group_by(Movement.movement_type).all()
+    mv_type_labels = [t[0].title() for t in type_breakdown]
+    mv_type_counts = [t[1] for t in type_breakdown]
+
+    # Top 5 warehouses by stock value
+    warehouses_all = Warehouse.query.filter_by(is_active=True).all()
+    wh_stock = []
+    for wh in warehouses_all:
+        val = db.session.query(func.sum(Stock.quantity * Item.unit_cost)).join(
+            Item, Stock.item_id == Item.id
+        ).filter(Stock.location_type == 'warehouse', Stock.warehouse_id == wh.id).scalar() or 0
+        wh_stock.append({'name': wh.name, 'value': float(val)})
+    wh_stock.sort(key=lambda x: -x['value'])
+
     return render_template('inventory/dashboard.html',
-        total_items=total_items, total_warehouses=total_warehouses,
-        total_sites=total_sites, active_projects=active_projects,
-        pending_requests=pending_requests, total_movements_today=total_movements_today,
+        total_items=total_items, consumable_items=consumable_items, asset_items=asset_items,
+        total_warehouses=total_warehouses, total_sites=total_sites,
+        active_projects=active_projects, pending_requests=pending_requests,
+        total_movements_today=total_movements_today, total_movements_month=total_movements_month,
+        total_inventory_value=float(total_inventory_value),
+        total_asset_units=total_asset_units, deployed_assets=deployed_assets,
+        available_assets=available_assets, maintenance_assets=maintenance_assets,
         recent_movements=recent_movements, recent_requests=recent_requests,
-        low_stock_items=low_stock_items[:5],
+        low_stock_items=low_stock_items[:8],
         chart_labels=chart_labels, chart_inflow=chart_inflow, chart_outflow=chart_outflow,
-        now=datetime.now())
+        mv_type_labels=mv_type_labels, mv_type_counts=mv_type_counts,
+        wh_stock=wh_stock, now=datetime.now())
 
 
 # ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -1887,3 +1927,182 @@ def site_quick_consume(site_id):
         flash(f'Pulled out: {qty} {item.unit} of {item.name} → {wh.name}.', 'success')
 
     return redirect(url_for('main.site_detail', site_id=site_id))
+
+
+# ══════════════════════════════════════════════════════════════════
+# BACKUP & RESTORE
+# ══════════════════════════════════════════════════════════════════
+import subprocess
+import tempfile
+import shutil
+import json
+import zipfile
+from urllib.parse import urlparse
+
+def _get_db_params():
+    url = current_app.config.get('SQLALCHEMY_DATABASE_URI') or os.environ.get('DATABASE_URL', '')
+    parsed = urlparse(url)
+    return {
+        'host': parsed.hostname or 'localhost',
+        'port': str(parsed.port or 5432),
+        'user': parsed.username or 'postgres',
+        'password': parsed.password or '',
+        'dbname': (parsed.path or '/philasia').lstrip('/'),
+    }
+
+@main.route('/admin/backup')
+@login_required
+@permission_required('manage_users')
+def backup_page():
+    import glob
+    backup_dir = current_app.config.get('BACKUP_DIR', os.path.join(os.path.dirname(current_app.root_path), 'backups'))
+    os.makedirs(backup_dir, exist_ok=True)
+    files = sorted(glob.glob(os.path.join(backup_dir, '*.sql')) +
+                   glob.glob(os.path.join(backup_dir, '*.zip')), reverse=True)
+    backup_files = []
+    for f in files[:30]:
+        stat = os.stat(f)
+        backup_files.append({
+            'name': os.path.basename(f),
+            'size': stat.st_size,
+            'mtime': datetime.fromtimestamp(stat.st_mtime),
+            'path': f,
+        })
+    return render_template('admin/backup.html', backup_files=backup_files, backup_dir=backup_dir)
+
+
+@main.route('/admin/backup/create', methods=['POST'])
+@login_required
+@permission_required('manage_users')
+def backup_create():
+    backup_dir = current_app.config.get('BACKUP_DIR', os.path.join(os.path.dirname(current_app.root_path), 'backups'))
+    os.makedirs(backup_dir, exist_ok=True)
+    params = _get_db_params()
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'philasia_backup_{ts}.sql'
+    filepath = os.path.join(backup_dir, filename)
+    env = os.environ.copy()
+    env['PGPASSWORD'] = params['password']
+    try:
+        result = subprocess.run(
+            ['pg_dump', '-h', params['host'], '-p', params['port'],
+             '-U', params['user'], '-d', params['dbname'],
+             '--no-owner', '--no-acl', '-f', filepath],
+            env=env, capture_output=True, text=True, timeout=120
+        )
+        if result.returncode != 0:
+            flash(f'Backup failed: {result.stderr[:300]}', 'danger')
+            return redirect(url_for('main.backup_page'))
+        flash(f'Backup created: {filename}', 'success')
+    except FileNotFoundError:
+        flash('pg_dump not found. Please install PostgreSQL client tools.', 'danger')
+    except Exception as e:
+        flash(f'Backup error: {e}', 'danger')
+    return redirect(url_for('main.backup_page'))
+
+
+@main.route('/admin/backup/download/<path:filename>')
+@login_required
+@permission_required('manage_users')
+def backup_download(filename):
+    backup_dir = current_app.config.get('BACKUP_DIR', os.path.join(os.path.dirname(current_app.root_path), 'backups'))
+    filepath = os.path.join(backup_dir, filename)
+    if not os.path.exists(filepath):
+        abort(404)
+    return send_file(filepath, as_attachment=True, download_name=filename)
+
+
+@main.route('/admin/backup/restore', methods=['POST'])
+@login_required
+@permission_required('manage_users')
+def backup_restore():
+    f = request.files.get('backup_file')
+    if not f or not f.filename:
+        flash('No file selected.', 'danger')
+        return redirect(url_for('main.backup_page'))
+    if not f.filename.endswith(('.sql', '.SQL')):
+        flash('Only .sql backup files are supported for restore.', 'danger')
+        return redirect(url_for('main.backup_page'))
+    params = _get_db_params()
+    with tempfile.NamedTemporaryFile(suffix='.sql', delete=False) as tmp:
+        f.save(tmp.name)
+        tmp_path = tmp.name
+    env = os.environ.copy()
+    env['PGPASSWORD'] = params['password']
+    try:
+        result = subprocess.run(
+            ['psql', '-h', params['host'], '-p', params['port'],
+             '-U', params['user'], '-d', params['dbname'],
+             '-f', tmp_path, '--set=ON_ERROR_STOP=1'],
+            env=env, capture_output=True, text=True, timeout=300
+        )
+        if result.returncode != 0:
+            flash(f'Restore failed: {result.stderr[:400]}', 'danger')
+        else:
+            flash('Database restored successfully from backup.', 'success')
+    except FileNotFoundError:
+        flash('psql not found. Please install PostgreSQL client tools.', 'danger')
+    except Exception as e:
+        flash(f'Restore error: {e}', 'danger')
+    finally:
+        os.unlink(tmp_path)
+    return redirect(url_for('main.backup_page'))
+
+
+@main.route('/admin/backup/delete/<path:filename>', methods=['POST'])
+@login_required
+@permission_required('manage_users')
+def backup_delete(filename):
+    backup_dir = current_app.config.get('BACKUP_DIR', os.path.join(os.path.dirname(current_app.root_path), 'backups'))
+    filepath = os.path.join(backup_dir, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        flash(f'Deleted backup: {filename}', 'success')
+    return redirect(url_for('main.backup_page'))
+
+
+@main.route('/admin/backup/export-json')
+@login_required
+@permission_required('manage_users')
+def backup_export_json():
+    """Export all key data as a portable JSON file (no pg_dump needed)."""
+    import decimal
+
+    def serialize(obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, decimal.Decimal):
+            return float(obj)
+        return str(obj)
+
+    data = {
+        'exported_at': datetime.now().isoformat(),
+        'version': '1.0',
+        'categories': [{'id': r.id, 'name': r.name, 'description': r.description} for r in Category.query.all()],
+        'items': [{'id': r.id, 'sku': r.sku, 'name': r.name, 'description': r.description,
+                   'unit': r.unit, 'unit_cost': float(r.unit_cost or 0),
+                   'reorder_level': float(r.reorder_level or 0),
+                   'item_type': r.item_type, 'category_id': r.category_id,
+                   'is_active': r.is_active, 'notes': r.notes} for r in Item.query.all()],
+        'warehouses': [{'id': r.id, 'name': r.name, 'location': r.location,
+                        'contact_person': r.contact_person} for r in Warehouse.query.all()],
+        'sites': [{'id': r.id, 'name': r.name, 'address': r.address,
+                   'client': r.client, 'status': r.status} for r in ProjectSite.query.all()],
+        'stock': [{'item_id': r.item_id, 'warehouse_id': r.warehouse_id,
+                   'site_id': r.site_id, 'location_type': r.location_type,
+                   'quantity': float(r.quantity or 0)} for r in Stock.query.all()],
+        'movements': [{'id': r.id, 'type': r.movement_type, 'item_id': r.item_id,
+                       'quantity': float(r.quantity or 0), 'date': serialize(r.date),
+                       'reference': r.reference, 'notes': r.notes} for r in Movement.query.order_by(Movement.date).all()],
+        'asset_units': [{'id': r.id, 'item_id': r.item_id, 'asset_tag': r.asset_tag,
+                         'serial_number': r.serial_number, 'status': r.status,
+                         'condition': r.condition, 'location_type': r.location_type,
+                         'location_id': r.location_id} for r in AssetUnit.query.all()],
+    }
+    json_str = json.dumps(data, default=serialize, indent=2)
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    return Response(
+        json_str,
+        mimetype='application/json',
+        headers={'Content-Disposition': f'attachment; filename=philasia_export_{ts}.json'}
+    )

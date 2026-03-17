@@ -1,0 +1,163 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Backup & Restore{% endblock %}
+{% block page_title %}Backup & Restore{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+  <div>
+    <h1><i class="bi bi-shield-check me-2 text-primary"></i>Backup & Restore</h1>
+    <p>Protect your data — create backups, download them, and restore when needed.</p>
+  </div>
+</div>
+
+<!-- How-to info -->
+<div class="alert d-flex gap-3 mb-4" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;">
+  <i class="bi bi-info-circle-fill text-primary fs-4 mt-1 flex-shrink-0"></i>
+  <div>
+    <strong>Local PC Backup Guide</strong><br>
+    Backups are saved to: <code>{{ backup_dir }}</code><br>
+    <span class="text-muted small">To back up to an external drive, map the drive then set
+    <code>BACKUP_DIR=/path/to/drive/PhilAsia_Backups</code> in your environment and restart.</span>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Create Backup -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-database-down text-primary"></i>
+        <span>Create New Backup</span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">Creates a full SQL dump of the database using <code>pg_dump</code>. Requires PostgreSQL client tools installed on this server.</p>
+        <form method="POST" action="{{ url_for('main.backup_create') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-save me-2"></i>Create SQL Backup Now
+          </button>
+        </form>
+        <hr>
+        <p class="text-muted small mb-2">No <code>pg_dump</code>? Export data as a portable JSON file instead:</p>
+        <a href="{{ url_for('main.backup_export_json') }}" class="btn btn-outline-secondary w-100">
+          <i class="bi bi-filetype-json me-2"></i>Export as JSON (Data Only)
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restore -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-database-up text-warning"></i>
+        <span>Restore from Backup</span>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-warning d-flex gap-2 py-2" style="font-size:.82rem;">
+          <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+          <span><strong>Warning:</strong> Restoring will overwrite the current database. Make sure you have a fresh backup before restoring.</span>
+        </div>
+        <form method="POST" action="{{ url_for('main.backup_restore') }}" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Select .sql backup file</label>
+            <input type="file" name="backup_file" accept=".sql" required class="form-control">
+          </div>
+          <button type="submit" class="btn btn-warning w-100" onclick="return confirm('Are you sure? This will overwrite the current database with the backup data!')">
+            <i class="bi bi-arrow-counterclockwise me-2"></i>Restore Database
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Backup Files List -->
+<div class="card mt-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-folder2-open me-2"></i>Saved Backups <span class="badge bg-secondary ms-1">{{ backup_files|length }}</span></span>
+    <small class="text-muted">{{ backup_dir }}</small>
+  </div>
+  {% if backup_files %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>Created</th>
+          <th>Size</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for bf in backup_files %}
+        <tr>
+          <td>
+            <i class="bi bi-file-earmark-code me-2 text-muted"></i>
+            <span class="fw-semibold">{{ bf.name }}</span>
+          </td>
+          <td>{{ bf.mtime.strftime('%b %d, %Y %I:%M %p') }}</td>
+          <td>
+            {% set sz = bf.size %}
+            {% if sz > 1048576 %}{{ "%.1f"|format(sz/1048576) }} MB
+            {% elif sz > 1024 %}{{ "%.0f"|format(sz/1024) }} KB
+            {% else %}{{ sz }} B{% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('main.backup_download', filename=bf.name) }}" class="btn btn-sm btn-outline-primary me-1">
+              <i class="bi bi-download me-1"></i>Download
+            </a>
+            <form method="POST" action="{{ url_for('main.backup_delete', filename=bf.name) }}" class="d-inline" onsubmit="return confirm('Delete this backup?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-archive fs-1 d-block mb-2 opacity-25"></i>
+    No backups yet. Create your first backup above.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Tips for Local PC Use -->
+<div class="card mt-4" style="background:#f8fafc;">
+  <div class="card-header"><i class="bi bi-lightbulb me-2 text-warning"></i>Tips for Local Server Setup</div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="d-flex gap-2">
+          <i class="bi bi-hdd-fill text-primary fs-5 flex-shrink-0"></i>
+          <div>
+            <div class="fw-semibold small">External Drive Backup</div>
+            <div class="text-muted" style="font-size:.8rem;">Set <code>BACKUP_DIR=D:\PhilAsia\Backups</code> (Windows) or <code>/mnt/backup</code> (Linux) in your <code>.env</code> file.</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="d-flex gap-2">
+          <i class="bi bi-cloud-arrow-up text-success fs-5 flex-shrink-0"></i>
+          <div>
+            <div class="fw-semibold small">Cloud Sync</div>
+            <div class="text-muted" style="font-size:.8rem;">Point your backup folder to a Google Drive or OneDrive sync folder for automatic cloud copies.</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="d-flex gap-2">
+          <i class="bi bi-clock-history text-warning fs-5 flex-shrink-0"></i>
+          <div>
+            <div class="fw-semibold small">Scheduled Backups</div>
+            <div class="text-muted" style="font-size:.8rem;">Use Windows Task Scheduler or Linux <code>cron</code> to call the backup endpoint automatically each day.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
