@@ -4,7 +4,12 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-end">
     <div><h1>Low Stock Alerts</h1><p>Items below their reorder threshold.</p></div>
-    <a href="{{ url_for('main.report_list') }}" class="btn btn-outline-secondary btn-sm">← Reports</a>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('main.export_low_stock') }}" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+        </a>
+        <a href="{{ url_for('main.report_list') }}" class="btn btn-outline-secondary btn-sm">← Reports</a>
+    </div>
 </div>
 {% if alerts %}
 <div class="card">

@@ -12,17 +12,22 @@ A comprehensive movement-based inventory management system for companies managin
 
 ## Key Features
 - **Dashboard** with live charts (7-day movement trends), low-stock alerts, recent activity
+- **Global Live Search** — Instant search across items, asset tags, sites, warehouses from the topbar
+- **Quick Entry** — Fast 3-in-1 form: Consumption, Pullout to Warehouse, or Stock Adjustment — no complex movement form needed
 - **Inventory Catalog** — Items with SKU, category, unit cost, photo, reorder threshold
 - **Two Item Types with separate workflows:**
   - **Consumables / Materials** (cement, rebar, fuel, etc.) — tracked by quantity. Movements: Delivery, Transfer (WH→Site), Pullout (Site→WH if surplus), Consumption (used up at site, cannot be pulled out), Adjustment, Return, Scrap
   - **Tools / Equipment / Non-Consumables (Assets)** — tracked individually by asset tag. Each physical unit is Transferred to site, Pulled out back to warehouse, or moved to another site. NEVER consumed.
 - **Asset Unit Management** — Individual unit lifecycle (Available → Deployed → Maintenance → Scrapped), bulk register, move/pullout per unit
+- **QR Code Generation** — QR codes for items and individual asset units (download or print)
+- **Print Labels** — Printable label sheets with QR codes for items and asset tags
+- **Category Overview** — Inventory value and stock summary grouped by category, with low-stock highlights
 - **Stock Ledger** — All quantities calculated from transaction history (immutable audit trail)
 - **Warehouses** — Multiple storage facilities with stock tracking and value calculation
 - **Project Sites** — Split view: Tools/Equipment (deployed units) vs Materials (consumable stock); both with pullout actions
 - **Material Requisitions** — Full workflow: submit → approve/reject → fulfill (auto-transfers stock)
-- **Vendor Input / Purchase Receipt** — Multi-item intake form (`/movements/vendor-input`). Mix existing catalog items and brand-new items (auto-created on the fly) in one receipt. Generates Input movements and adds new items to catalog atomically.
-- **Reports** — Stock levels matrix, movement log with filters, low stock alerts
+- **Vendor Input / Purchase Receipt** — Multi-item intake form (`/movements/vendor-input`). Mix existing catalog items and brand-new items (auto-created on the fly) in one receipt.
+- **Reports with Excel Export** — Stock levels, movement log, and low stock alerts — all exportable to .xlsx
 - **User Management** — 7 roles with permission-based access control (admin only)
 - **Profile** — Password change for all users
 

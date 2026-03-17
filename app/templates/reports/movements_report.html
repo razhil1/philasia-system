@@ -4,7 +4,12 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-end">
     <div><h1>Movement Log Report</h1><p>Filtered audit trail of all inventory transactions.</p></div>
-    <a href="{{ url_for('main.report_list') }}" class="btn btn-outline-secondary btn-sm">← Reports</a>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('main.export_movements', date_from=date_from or '', date_to=date_to or '', type=mtype or '') }}" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+        </a>
+        <a href="{{ url_for('main.report_list') }}" class="btn btn-outline-secondary btn-sm">← Reports</a>
+    </div>
 </div>
 
 <div class="card mb-3 p-3">

@@ -143,7 +143,7 @@
 
     <div class="sidebar-section">Inventory</div>
     <div class="nav-item-s">
-        <a href="{{ url_for('main.item_list') }}" class="{{ 'active' if 'item' in (request.endpoint or '') }}">
+        <a href="{{ url_for('main.item_list') }}" class="{{ 'active' if request.endpoint in ('main.item_list','main.item_create','main.item_detail','main.item_edit') }}">
             <i class="bi bi-box-seam"></i> Items & Assets
         </a>
     </div>
@@ -153,12 +153,24 @@
         </a>
     </div>
     <div class="nav-item-s">
-        <a href="{{ url_for('main.category_list') }}" class="{{ 'active' if 'category' in (request.endpoint or '') }}">
+        <a href="{{ url_for('main.category_overview') }}" class="{{ 'active' if request.endpoint == 'main.category_overview' }}">
+            <i class="bi bi-pie-chart"></i> By Category
+        </a>
+    </div>
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.category_list') }}" class="{{ 'active' if 'category' in (request.endpoint or '') and request.endpoint != 'main.category_overview' }}">
             <i class="bi bi-tags"></i> Categories
         </a>
     </div>
 
     <div class="sidebar-section">Operations</div>
+    {% if current_user.can('manage_movements') %}
+    <div class="nav-item-s">
+        <a href="{{ url_for('main.quick_consume') }}" class="{{ 'active' if request.endpoint == 'main.quick_consume' }}" style="color:#34d399;">
+            <i class="bi bi-lightning-charge-fill"></i> Quick Entry
+        </a>
+    </div>
+    {% endif %}
     <div class="nav-item-s">
         <a href="{{ url_for('main.movement_list') }}" class="{{ 'active' if request.endpoint == 'main.movement_list' or request.endpoint == 'main.movement_create' or request.endpoint == 'main.movement_detail' }}">
             <i class="bi bi-arrow-left-right"></i> Movements
@@ -234,7 +246,19 @@
 <div class="main-wrap">
     <div class="topbar">
         <span class="topbar-title">{% block page_title %}{% endblock %}</span>
-        <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center gap-2 flex-grow-1 mx-3" style="max-width:420px;position:relative;">
+            <div class="input-group input-group-sm" style="position:relative;">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" id="globalSearch" class="form-control border-start-0 ps-0" placeholder="Search items, assets, sites…" autocomplete="off" style="border-radius:0 8px 8px 0;">
+            </div>
+            <div id="searchDropdown" class="shadow border rounded-3 bg-white" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:9999;max-height:360px;overflow-y:auto;"></div>
+        </div>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+            {% if current_user.can('manage_movements') %}
+            <a href="{{ url_for('main.quick_consume') }}" class="btn btn-sm btn-outline-success" title="Quick Consume / Adjust">
+                <i class="bi bi-lightning-charge-fill me-1"></i>Quick Entry
+            </a>
+            {% endif %}
             <div class="dropdown">
                 <button class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
                     <i class="bi bi-plus-lg me-1"></i> New
@@ -275,6 +299,44 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+    const inp = document.getElementById('globalSearch');
+    const drop = document.getElementById('searchDropdown');
+    if (!inp) return;
+    let timer;
+    const typeColors = {item:'#1a6fd4',asset:'#7c3aed',site:'#10b981',warehouse:'#f59e0b'};
+    inp.addEventListener('input', function(){
+        clearTimeout(timer);
+        const q = this.value.trim();
+        if (q.length < 2) { drop.style.display='none'; return; }
+        timer = setTimeout(() => {
+            fetch('/api/search?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => {
+                if (!data.length) { drop.innerHTML='<div class="p-3 text-muted small text-center">No results found</div>'; drop.style.display='block'; return; }
+                drop.innerHTML = data.map(r =>
+                    `<a href="${r.url}" class="d-flex align-items-center gap-2 px-3 py-2 text-decoration-none text-dark border-bottom" style="font-size:.85rem;transition:background .1s;" onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background=''">
+                        <i class="bi bi-${r.icon}" style="color:${typeColors[r.type]||'#666'};font-size:.9rem;width:18px;text-align:center;flex-shrink:0;"></i>
+                        <div class="flex-grow-1 min-width-0">
+                            <div class="fw-semibold text-truncate">${r.label}</div>
+                            <div class="text-muted" style="font-size:.75rem;">${r.sub}</div>
+                        </div>
+                        <span class="badge rounded-pill" style="background:#f0f4f8;color:#64748b;font-size:.68rem;">${r.type}</span>
+                    </a>`
+                ).join('');
+                drop.style.display = 'block';
+            });
+        }, 220);
+    });
+    document.addEventListener('click', function(e){
+        if (!inp.contains(e.target) && !drop.contains(e.target)) drop.style.display='none';
+    });
+    inp.addEventListener('keydown', function(e){
+        if (e.key === 'Escape') { drop.style.display='none'; inp.blur(); }
+    });
+})();
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

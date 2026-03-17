@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, flash, redirect, url_for, request, current_app, abort, jsonify
+from flask import Blueprint, render_template, flash, redirect, url_for, request, current_app, abort, jsonify, send_file, Response
 from flask_login import login_required, current_user
 from functools import wraps
 from app import db
@@ -9,10 +9,11 @@ from app.forms import (ItemForm, WarehouseForm, ProjectSiteForm, MovementForm,
                         RequestForm, RequestItemForm, UserForm, CategoryForm,
                         ApproveRequestForm, RejectRequestForm, ReportFilterForm,
                         ChangePasswordForm, AssetUnitForm, AssetMovementForm)
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, or_
 from datetime import datetime, date, timedelta
 from werkzeug.utils import secure_filename
 import os
+import io
 
 main = Blueprint('main', __name__)
 
@@ -1427,3 +1428,462 @@ def api_item_stock(item_id):
         'location': s.location_name(),
         'quantity': float(s.quantity),
     } for s in stocks])
+
+
+# ─── GLOBAL SEARCH ────────────────────────────────────────────────────────────
+
+@main.route('/api/search')
+@login_required
+def api_search():
+    q = request.args.get('q', '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    pat = f'%{q}%'
+    results = []
+
+    items = Item.query.filter(
+        Item.is_active == True,
+        or_(Item.name.ilike(pat), Item.sku.ilike(pat), Item.description.ilike(pat))
+    ).limit(6).all()
+    for i in items:
+        results.append({'type': 'item', 'label': i.name, 'sub': i.sku,
+                        'url': url_for('main.item_detail', item_id=i.id),
+                        'icon': 'box-seam'})
+
+    assets = AssetUnit.query.filter(
+        or_(AssetUnit.asset_tag.ilike(pat), AssetUnit.serial_number.ilike(pat))
+    ).limit(5).all()
+    for a in assets:
+        results.append({'type': 'asset', 'label': a.asset_tag,
+                        'sub': a.item.name,
+                        'url': url_for('main.asset_unit_list', item_id=a.item_id),
+                        'icon': 'tag'})
+
+    sites = ProjectSite.query.filter(
+        or_(ProjectSite.name.ilike(pat), ProjectSite.client.ilike(pat))
+    ).limit(4).all()
+    for s in sites:
+        results.append({'type': 'site', 'label': s.name, 'sub': s.client,
+                        'url': url_for('main.site_detail', site_id=s.id),
+                        'icon': 'geo-alt'})
+
+    warehouses = Warehouse.query.filter(
+        Warehouse.name.ilike(pat)
+    ).limit(3).all()
+    for w in warehouses:
+        results.append({'type': 'warehouse', 'label': w.name, 'sub': w.location or '',
+                        'url': url_for('main.warehouse_detail', wh_id=w.id),
+                        'icon': 'building'})
+
+    return jsonify(results[:15])
+
+
+# ─── QUICK CONSUMPTION ────────────────────────────────────────────────────────
+
+@main.route('/quick/consume', methods=['GET', 'POST'])
+@login_required
+@permission_required('manage_movements')
+def quick_consume():
+    sites = ProjectSite.query.filter(ProjectSite.status.in_(['active', 'planned'])).order_by('name').all()
+    items_consumable = Item.query.filter_by(is_active=True, item_type='consumable').order_by('name').all()
+    warehouses = Warehouse.query.filter_by(is_active=True).order_by('name').all()
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'consumption')
+        item_id = int(request.form.get('item_id', 0))
+        qty = float(request.form.get('quantity', 0))
+        site_id = int(request.form.get('site_id', 0)) or None
+        warehouse_id = int(request.form.get('warehouse_id', 0)) or None
+        notes = request.form.get('notes', '')
+        reference = request.form.get('reference', '')
+
+        item = Item.query.get(item_id)
+        if not item or qty <= 0:
+            flash('Please select a valid item and quantity.', 'danger')
+            return render_template('inventory/quick_consume.html', sites=sites,
+                                   items=items_consumable, warehouses=warehouses)
+
+        if action == 'consumption':
+            if not site_id:
+                flash('Please select a site for consumption.', 'danger')
+                return render_template('inventory/quick_consume.html', sites=sites,
+                                       items=items_consumable, warehouses=warehouses)
+            src = Stock.query.filter_by(item_id=item_id, location_type='site', site_id=site_id).first()
+            avail = float(src.quantity) if src else 0
+            if avail < qty:
+                flash(f'Insufficient stock at site. Available: {avail} {item.unit}', 'danger')
+                return render_template('inventory/quick_consume.html', sites=sites,
+                                       items=items_consumable, warehouses=warehouses)
+            mov = Movement(movement_type='consumption', item_id=item_id, quantity=qty,
+                           unit_cost=item.unit_cost,
+                           from_location_type='site', from_site_id=site_id,
+                           to_location_type=None, reference=reference, notes=notes,
+                           user_id=current_user.id)
+            db.session.add(mov)
+            _update_stock(item_id, 'site', None, site_id, -qty)
+
+        elif action == 'pullout':
+            if not site_id:
+                flash('Please select the source site.', 'danger')
+                return render_template('inventory/quick_consume.html', sites=sites,
+                                       items=items_consumable, warehouses=warehouses)
+            if not warehouse_id:
+                flash('Please select the destination warehouse.', 'danger')
+                return render_template('inventory/quick_consume.html', sites=sites,
+                                       items=items_consumable, warehouses=warehouses)
+            src = Stock.query.filter_by(item_id=item_id, location_type='site', site_id=site_id).first()
+            avail = float(src.quantity) if src else 0
+            if avail < qty:
+                flash(f'Insufficient stock at site. Available: {avail} {item.unit}', 'danger')
+                return render_template('inventory/quick_consume.html', sites=sites,
+                                       items=items_consumable, warehouses=warehouses)
+            mov = Movement(movement_type='pullout', item_id=item_id, quantity=qty,
+                           unit_cost=item.unit_cost,
+                           from_location_type='site', from_site_id=site_id,
+                           to_location_type='warehouse', to_warehouse_id=warehouse_id,
+                           reference=reference, notes=notes, user_id=current_user.id)
+            db.session.add(mov)
+            _update_stock(item_id, 'site', None, site_id, -qty)
+            _update_stock(item_id, 'warehouse', warehouse_id, None, qty)
+
+        elif action == 'adjustment':
+            loc_type = request.form.get('adj_loc_type', 'warehouse')
+            loc_id_adj = int(request.form.get('adj_loc_id', 0)) or None
+            if not loc_id_adj:
+                flash('Please select a location for adjustment.', 'danger')
+                return render_template('inventory/quick_consume.html', sites=sites,
+                                       items=items_consumable, warehouses=warehouses)
+            new_qty = float(request.form.get('new_quantity', 0))
+            # Find current stock
+            q_filter = Stock.query.filter_by(item_id=item_id, location_type=loc_type)
+            if loc_type == 'warehouse':
+                q_filter = q_filter.filter_by(warehouse_id=loc_id_adj)
+            else:
+                q_filter = q_filter.filter_by(site_id=loc_id_adj)
+            cur_stock = q_filter.first()
+            cur_qty = float(cur_stock.quantity) if cur_stock else 0
+            delta = new_qty - cur_qty
+            if delta == 0:
+                flash('No change — stock quantity is already at that level.', 'info')
+                return redirect(url_for('main.quick_consume'))
+            mov = Movement(movement_type='adjustment', item_id=item_id, quantity=abs(delta),
+                           unit_cost=item.unit_cost,
+                           from_location_type=loc_type if delta < 0 else None,
+                           from_warehouse_id=loc_id_adj if loc_type == 'warehouse' and delta < 0 else None,
+                           from_site_id=loc_id_adj if loc_type == 'site' and delta < 0 else None,
+                           to_location_type=loc_type if delta > 0 else None,
+                           to_warehouse_id=loc_id_adj if loc_type == 'warehouse' and delta > 0 else None,
+                           to_site_id=loc_id_adj if loc_type == 'site' and delta > 0 else None,
+                           reference=reference, notes=notes or f'Stock adjustment: {cur_qty} → {new_qty}',
+                           user_id=current_user.id)
+            db.session.add(mov)
+            _update_stock(item_id, loc_type,
+                          loc_id_adj if loc_type == 'warehouse' else None,
+                          loc_id_adj if loc_type == 'site' else None,
+                          delta)
+
+        db.session.commit()
+        flash(f'Transaction recorded: {qty} {item.unit} of {item.name}.', 'success')
+        return redirect(url_for('main.quick_consume'))
+
+    prefill_item = request.args.get('item_id', type=int)
+    prefill_site = request.args.get('site_id', type=int)
+    recent_movs = Movement.query.filter(
+        Movement.movement_type.in_(['consumption', 'pullout', 'adjustment'])
+    ).order_by(desc(Movement.date)).limit(10).all()
+    return render_template('inventory/quick_consume.html', sites=sites,
+                           items=items_consumable, warehouses=warehouses,
+                           prefill_item=prefill_item, prefill_site=prefill_site,
+                           recent_movs=recent_movs)
+
+
+# ─── QR CODE GENERATION ───────────────────────────────────────────────────────
+
+@main.route('/qr/item/<int:item_id>')
+@login_required
+def qr_item(item_id):
+    item = Item.query.get_or_404(item_id)
+    import qrcode
+    url = url_for('main.item_detail', item_id=item_id, _external=True)
+    img = qrcode.make(url)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png',
+                     download_name=f'qr_{item.sku}.png')
+
+
+@main.route('/qr/asset/<int:unit_id>')
+@login_required
+def qr_asset_unit(unit_id):
+    unit = AssetUnit.query.get_or_404(unit_id)
+    import qrcode
+    url = url_for('main.asset_unit_list', item_id=unit.item_id, _external=True)
+    data = f"TAG:{unit.asset_tag}|ITEM:{unit.item.name}|SN:{unit.serial_number or '-'}|URL:{url}"
+    img = qrcode.make(data)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png',
+                     download_name=f'qr_{unit.asset_tag}.png')
+
+
+@main.route('/items/<int:item_id>/labels')
+@login_required
+def item_labels(item_id):
+    item = Item.query.get_or_404(item_id)
+    units = []
+    if item.is_asset:
+        units = AssetUnit.query.filter_by(item_id=item_id).order_by(AssetUnit.asset_tag).all()
+    warehouses = {w.id: w.name for w in Warehouse.query.all()}
+    sites = {s.id: s.name for s in ProjectSite.query.all()}
+    return render_template('inventory/item_labels.html', item=item, units=units,
+                           warehouses=warehouses, sites=sites)
+
+
+# ─── EXCEL EXPORTS ────────────────────────────────────────────────────────────
+
+def _make_workbook():
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    wb = openpyxl.Workbook()
+    header_fill = PatternFill(start_color='1a6fd4', end_color='1a6fd4', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    thin = Side(style='thin', color='D0D0D0')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    alt_fill = PatternFill(start_color='EEF4FF', end_color='EEF4FF', fill_type='solid')
+    return wb, header_fill, header_font, border, alt_fill
+
+
+@main.route('/reports/stock/export')
+@login_required
+def export_stock():
+    wb, hfill, hfont, border, altfill = _make_workbook()
+    from openpyxl.styles import Alignment
+    ws = wb.active
+    ws.title = 'Stock Report'
+
+    items = Item.query.filter_by(is_active=True).order_by(Item.name).all()
+    warehouses = Warehouse.query.filter_by(is_active=True).all()
+    sites = ProjectSite.query.all()
+
+    headers = ['SKU', 'Item Name', 'Type', 'Unit', 'Reorder Level', 'Total Stock', 'Status']
+    for w in warehouses:
+        headers.append(f'WH: {w.name}')
+    for s in sites:
+        headers.append(f'Site: {s.name}')
+
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = hfont
+        cell.fill = hfill
+        cell.alignment = Alignment(horizontal='center')
+
+    for row_i, item in enumerate(items, 2):
+        total = item.total_stock()
+        status = 'LOW STOCK' if item.is_low_stock() else 'OK'
+        row_data = [item.sku, item.name, item.type_label, item.unit,
+                    float(item.reorder_level or 0), total, status]
+        for w in warehouses:
+            s = Stock.query.filter_by(item_id=item.id, warehouse_id=w.id, location_type='warehouse').first()
+            row_data.append(float(s.quantity) if s else 0)
+        for site in sites:
+            s = Stock.query.filter_by(item_id=item.id, site_id=site.id, location_type='site').first()
+            row_data.append(float(s.quantity) if s else 0)
+        for col, val in enumerate(row_data, 1):
+            cell = ws.cell(row=row_i, column=col, value=val)
+            cell.border = border
+            if row_i % 2 == 0:
+                cell.fill = altfill
+
+    for col in ws.columns:
+        max_len = max((len(str(c.value or '')) for c in col), default=8)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+    ws.auto_filter.ref = ws.dimensions
+    ws.freeze_panes = 'A2'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f'stock_report_{date.today()}.xlsx'
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     download_name=fname, as_attachment=True)
+
+
+@main.route('/reports/movements/export')
+@login_required
+def export_movements():
+    wb, hfill, hfont, border, altfill = _make_workbook()
+    from openpyxl.styles import Alignment
+    ws = wb.active
+    ws.title = 'Movement Log'
+
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    mtype = request.args.get('type', '')
+
+    q = Movement.query.order_by(desc(Movement.date))
+    if date_from:
+        try:
+            q = q.filter(Movement.date >= datetime.strptime(date_from, '%Y-%m-%d'))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            q = q.filter(Movement.date <= datetime.strptime(date_to, '%Y-%m-%d').replace(hour=23, minute=59))
+        except ValueError:
+            pass
+    if mtype:
+        q = q.filter_by(movement_type=mtype)
+
+    movements = q.all()
+
+    headers = ['#', 'Date', 'Type', 'Item', 'SKU', 'Quantity', 'Unit', 'Unit Cost',
+               'Total Value', 'From', 'To', 'Reference', 'Notes', 'Posted By']
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = hfont
+        cell.fill = hfill
+        cell.alignment = Alignment(horizontal='center')
+
+    for row_i, m in enumerate(movements, 2):
+        total_val = float(m.quantity or 0) * float(m.unit_cost or 0)
+        row_data = [m.id, m.date.strftime('%Y-%m-%d %H:%M'),
+                    MOVEMENT_TYPES.get(m.movement_type, m.movement_type),
+                    m.item.name, m.item.sku,
+                    float(m.quantity), m.item.unit, float(m.unit_cost or 0), total_val,
+                    m.from_location_name(), m.to_location_name(),
+                    m.reference or '', m.notes or '', m.created_by.username]
+        for col, val in enumerate(row_data, 1):
+            cell = ws.cell(row=row_i, column=col, value=val)
+            cell.border = border
+            if row_i % 2 == 0:
+                cell.fill = altfill
+
+    for col in ws.columns:
+        max_len = max((len(str(c.value or '')) for c in col), default=8)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+    ws.auto_filter.ref = ws.dimensions
+    ws.freeze_panes = 'A2'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f'movements_{date.today()}.xlsx'
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     download_name=fname, as_attachment=True)
+
+
+@main.route('/reports/low-stock/export')
+@login_required
+def export_low_stock():
+    wb, hfill, hfont, border, altfill = _make_workbook()
+    from openpyxl.styles import Alignment, Font, PatternFill
+    ws = wb.active
+    ws.title = 'Low Stock Alerts'
+
+    headers = ['SKU', 'Item Name', 'Type', 'Unit', 'Current Stock', 'Reorder Level', 'Shortage']
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = hfont
+        cell.fill = hfill
+        cell.alignment = Alignment(horizontal='center')
+
+    row_i = 2
+    red_fill = PatternFill(start_color='FEE2E2', end_color='FEE2E2', fill_type='solid')
+    for item in Item.query.filter_by(is_active=True).all():
+        total = item.total_stock()
+        if total < float(item.reorder_level or 0):
+            shortage = float(item.reorder_level or 0) - total
+            row_data = [item.sku, item.name, item.type_label, item.unit,
+                        total, float(item.reorder_level or 0), shortage]
+            for col, val in enumerate(row_data, 1):
+                cell = ws.cell(row=row_i, column=col, value=val)
+                cell.border = border
+                cell.fill = red_fill
+            row_i += 1
+
+    for col in ws.columns:
+        max_len = max((len(str(c.value or '')) for c in col), default=8)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f'low_stock_{date.today()}.xlsx'
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     download_name=fname, as_attachment=True)
+
+
+# ─── CATEGORY OVERVIEW ────────────────────────────────────────────────────────
+
+@main.route('/categories/overview')
+@login_required
+def category_overview():
+    categories = Category.query.order_by(Category.name).all()
+    cat_data = []
+    for cat in categories:
+        items = Item.query.filter_by(category_id=cat.id, is_active=True).all()
+        total_items = len(items)
+        low_count = sum(1 for i in items if i.is_low_stock())
+        total_value = sum(float(i.unit_cost or 0) * i.total_stock() for i in items)
+        cat_data.append({
+            'cat': cat, 'total_items': total_items,
+            'low_count': low_count, 'total_value': total_value,
+            'items': items
+        })
+    return render_template('inventory/category_overview.html', cat_data=cat_data)
+
+
+# ─── SITE CONSUMPTION QUICK ENTRY ─────────────────────────────────────────────
+
+@main.route('/sites/<int:site_id>/consume', methods=['POST'])
+@login_required
+@permission_required('manage_movements')
+def site_quick_consume(site_id):
+    site = ProjectSite.query.get_or_404(site_id)
+    item_id = int(request.form.get('item_id', 0))
+    qty = float(request.form.get('quantity', 0))
+    action = request.form.get('action', 'consumption')
+
+    item = Item.query.get(item_id)
+    if not item or qty <= 0:
+        flash('Invalid item or quantity.', 'danger')
+        return redirect(url_for('main.site_detail', site_id=site_id))
+
+    src = Stock.query.filter_by(item_id=item_id, location_type='site', site_id=site_id).first()
+    avail = float(src.quantity) if src else 0
+    if avail < qty:
+        flash(f'Not enough stock. Available: {avail} {item.unit}', 'danger')
+        return redirect(url_for('main.site_detail', site_id=site_id))
+
+    if action == 'consumption':
+        mov = Movement(movement_type='consumption', item_id=item_id, quantity=qty,
+                       unit_cost=item.unit_cost,
+                       from_location_type='site', from_site_id=site_id,
+                       to_location_type=None,
+                       notes=f'Quick consume from site page', user_id=current_user.id)
+        db.session.add(mov)
+        _update_stock(item_id, 'site', None, site_id, -qty)
+        db.session.commit()
+        flash(f'Recorded: {qty} {item.unit} of {item.name} consumed.', 'success')
+    elif action == 'pullout':
+        wh_id = int(request.form.get('warehouse_id', 0))
+        wh = Warehouse.query.get(wh_id)
+        if not wh:
+            flash('Please select a warehouse for pullout.', 'danger')
+            return redirect(url_for('main.site_detail', site_id=site_id))
+        mov = Movement(movement_type='pullout', item_id=item_id, quantity=qty,
+                       unit_cost=item.unit_cost,
+                       from_location_type='site', from_site_id=site_id,
+                       to_location_type='warehouse', to_warehouse_id=wh_id,
+                       notes=f'Quick pullout from site page', user_id=current_user.id)
+        db.session.add(mov)
+        _update_stock(item_id, 'site', None, site_id, -qty)
+        _update_stock(item_id, 'warehouse', wh_id, None, qty)
+        db.session.commit()
+        flash(f'Pulled out: {qty} {item.unit} of {item.name} → {wh.name}.', 'success')
+
+    return redirect(url_for('main.site_detail', site_id=site_id))

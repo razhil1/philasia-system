@@ -1,0 +1,224 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Quick Entry{% endblock %}
+{% block page_title %}Quick Entry{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-lightning-charge-fill text-success me-2"></i>Quick Entry</h1>
+    <p>Fast record of consumption, pullout, or stock adjustment — no full form needed.</p>
+</div>
+
+<div class="row g-4">
+    <!-- CONSUMPTION -->
+    <div class="col-lg-4">
+        <div class="card h-100 border-danger border-opacity-25">
+            <div class="card-header" style="background:#fff5f5;">
+                <i class="bi bi-fire text-danger me-2"></i><strong>Record Consumption</strong>
+                <div class="text-muted" style="font-size:.78rem;font-weight:400;">Materials used up at a project site</div>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="consumption">
+                    <div class="mb-3">
+                        <label class="form-label">Item / Material</label>
+                        <select name="item_id" class="form-select item-select" required>
+                            <option value="">— Select item —</option>
+                            {% for i in items %}
+                            <option value="{{ i.id }}" {% if prefill_item == i.id %}selected{% endif %}>{{ i.name }} [{{ i.sku }}] — {{ i.unit }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Project Site</label>
+                        <select name="site_id" class="form-select" required>
+                            <option value="">— Select site —</option>
+                            {% for s in sites %}
+                            <option value="{{ s.id }}" {% if prefill_site == s.id %}selected{% endif %}>{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Quantity Consumed</label>
+                        <input type="number" name="quantity" class="form-control" min="0.001" step="any" placeholder="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reference / Notes <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="text" name="notes" class="form-control" placeholder="e.g. used for formworks">
+                    </div>
+                    <button type="submit" class="btn btn-danger w-100">
+                        <i class="bi bi-fire me-1"></i> Record Consumption
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- PULLOUT -->
+    <div class="col-lg-4">
+        <div class="card h-100 border-info border-opacity-25">
+            <div class="card-header" style="background:#f0faff;">
+                <i class="bi bi-box-arrow-left text-info me-2"></i><strong>Pullout to Warehouse</strong>
+                <div class="text-muted" style="font-size:.78rem;font-weight:400;">Return surplus materials from site to warehouse</div>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="pullout">
+                    <div class="mb-3">
+                        <label class="form-label">Item / Material</label>
+                        <select name="item_id" class="form-select" required>
+                            <option value="">— Select item —</option>
+                            {% for i in items %}
+                            <option value="{{ i.id }}">{{ i.name }} [{{ i.sku }}] — {{ i.unit }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">From Site</label>
+                        <select name="site_id" class="form-select" required>
+                            <option value="">— Select site —</option>
+                            {% for s in sites %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">To Warehouse</label>
+                        <select name="warehouse_id" class="form-select" required>
+                            <option value="">— Select warehouse —</option>
+                            {% for w in warehouses %}
+                            <option value="{{ w.id }}">{{ w.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" name="quantity" class="form-control" min="0.001" step="any" placeholder="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reference <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="text" name="reference" class="form-control" placeholder="PO / DR number">
+                    </div>
+                    <button type="submit" class="btn btn-info w-100 text-white">
+                        <i class="bi bi-box-arrow-left me-1"></i> Pullout to Warehouse
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- STOCK ADJUSTMENT -->
+    <div class="col-lg-4">
+        <div class="card h-100 border-warning border-opacity-25">
+            <div class="card-header" style="background:#fffbeb;">
+                <i class="bi bi-sliders text-warning me-2"></i><strong>Stock Adjustment</strong>
+                <div class="text-muted" style="font-size:.78rem;font-weight:400;">Correct stock count after physical inventory</div>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="adjustment">
+                    <div class="mb-3">
+                        <label class="form-label">Item</label>
+                        <select name="item_id" class="form-select adj-item" required>
+                            <option value="">— Select item —</option>
+                            {% for i in items %}
+                            <option value="{{ i.id }}">{{ i.name }} [{{ i.sku }}] — {{ i.unit }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Location Type</label>
+                        <select name="adj_loc_type" class="form-select adj-loc-type" required>
+                            <option value="warehouse">Warehouse</option>
+                            <option value="site">Project Site</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 adj-warehouse-row">
+                        <label class="form-label">Warehouse</label>
+                        <select name="adj_loc_id" class="form-select">
+                            <option value="">— Select —</option>
+                            {% for w in warehouses %}
+                            <option value="{{ w.id }}">{{ w.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3 adj-site-row" style="display:none;">
+                        <label class="form-label">Project Site</label>
+                        <select name="adj_loc_id_site" class="form-select">
+                            <option value="">— Select —</option>
+                            {% for s in sites %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Actual Count (New Quantity)</label>
+                        <input type="number" name="new_quantity" class="form-control" min="0" step="any" placeholder="Enter actual physical count" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Quantity to Adjust <span class="text-muted fw-normal">(used by system)</span></label>
+                        <input type="number" name="quantity" class="form-control" value="0" readonly style="background:#f8f9fa;">
+                        <div class="form-text">This field is computed automatically by the system.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="text" name="notes" class="form-control" placeholder="e.g. physical count discrepancy">
+                    </div>
+                    <button type="submit" class="btn btn-warning w-100">
+                        <i class="bi bi-sliders me-1"></i> Apply Adjustment
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-clock-history me-2"></i>Recent Transactions (last 10)</span>
+            <a href="{{ url_for('main.movement_list') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+        </div>
+        <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Location</th><th>By</th></tr></thead>
+            <tbody>
+            {% for m in recent_movs %}
+            <tr>
+                <td class="text-muted small">{{ m.date.strftime('%b %d, %H:%M') }}</td>
+                <td><span class="badge move-{{ m.movement_type }}">{{ m.type_label }}</span></td>
+                <td class="fw-semibold small">{{ m.item.name }}</td>
+                <td>{{ m.quantity }} {{ m.item.unit }}</td>
+                <td class="text-muted small">{{ m.from_location_name() }}</td>
+                <td class="text-muted small">{{ m.created_by.username }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.adj-loc-type').forEach(sel => {
+    sel.addEventListener('change', function(){
+        const card = this.closest('form');
+        const wRow = card.querySelector('.adj-warehouse-row');
+        const sRow = card.querySelector('.adj-site-row');
+        if (this.value === 'warehouse') { wRow.style.display=''; sRow.style.display='none'; }
+        else { wRow.style.display='none'; sRow.style.display=''; }
+    });
+});
+
+// Sync the hidden adj_loc_id for site selector
+document.querySelectorAll('.adj-site-row select').forEach(sel => {
+    sel.addEventListener('change', function(){
+        const wh = this.closest('form').querySelector('[name="adj_loc_id"]');
+        if (wh) wh.value = this.value;
+    });
+});
+</script>
+{% endblock %}

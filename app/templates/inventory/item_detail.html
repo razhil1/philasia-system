@@ -15,9 +15,24 @@
             {% endif %}
         </p>
     </div>
-    {% if current_user.can('manage_inventory') %}
-    <a href="{{ url_for('main.item_edit', item_id=item.id) }}" class="btn btn-outline-primary"><i class="bi bi-pencil me-1"></i>Edit</a>
-    {% endif %}
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('main.item_labels', item_id=item.id) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+            <i class="bi bi-printer me-1"></i>Print Labels
+        </a>
+        <a href="{{ url_for('main.qr_item', item_id=item.id) }}" class="btn btn-outline-secondary btn-sm" target="_blank" title="Download QR Code">
+            <i class="bi bi-qr-code me-1"></i>QR Code
+        </a>
+        {% if not item.is_asset and current_user.can('manage_movements') %}
+        <a href="{{ url_for('main.quick_consume', item_id=item.id) }}" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-lightning-charge-fill me-1"></i>Quick Entry
+        </a>
+        {% endif %}
+        {% if current_user.can('manage_inventory') %}
+        <a href="{{ url_for('main.item_edit', item_id=item.id) }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        {% endif %}
+    </div>
 </div>
 
 {% if item.is_asset %}

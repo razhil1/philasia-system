@@ -1,0 +1,80 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Print Labels — {{ item.name }}{% endblock %}
+{% block page_title %}Print Labels{% endblock %}
+{% block extra_css %}
+<style>
+@media print {
+    .sidebar, .topbar, .no-print { display: none !important; }
+    .main-wrap { margin-left: 0 !important; }
+    .page-content { padding: 0 !important; }
+    .label-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .label-card { width: 200px; height: 130px; border: 1px solid #ccc; border-radius: 6px; padding: 8px; font-family: monospace; }
+}
+.label-card { width: 210px; border: 1px solid #dee2e6; border-radius: 8px; padding: 10px; background: #fff; text-align: center; }
+.label-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end no-print">
+    <div>
+        <h1>Labels — {{ item.name }}</h1>
+        <p><code>{{ item.sku }}</code> · {{ item.unit }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="bi bi-printer me-1"></i>Print Labels
+        </button>
+        <a href="{{ url_for('main.item_detail', item_id=item.id) }}" class="btn btn-outline-secondary btn-sm no-print">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
+</div>
+
+{% if item.is_asset and units %}
+<div class="mb-3 no-print">
+    <strong>{{ units|length }} asset unit labels</strong> ready to print.
+    Each label includes the asset tag and QR code for quick scanning.
+</div>
+<div class="label-grid">
+{% for unit in units %}
+<div class="label-card">
+    <div style="font-size:.65rem;color:#666;text-transform:uppercase;letter-spacing:.05em;">{{ item.name[:28] }}</div>
+    <div style="font-size:1rem;font-weight:700;margin:.2rem 0;">{{ unit.asset_tag }}</div>
+    <img src="{{ url_for('main.qr_asset_unit', unit_id=unit.id) }}" width="72" height="72" alt="QR">
+    <div style="font-size:.65rem;color:#888;margin-top:.2rem;">
+        {{ unit.condition_label }} · {{ unit.status_label }}
+    </div>
+    {% if unit.serial_number %}
+    <div style="font-size:.6rem;color:#aaa;">SN: {{ unit.serial_number }}</div>
+    {% endif %}
+</div>
+{% endfor %}
+</div>
+
+{% elif not item.is_asset %}
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="label-card mx-auto">
+            <div style="font-size:.65rem;color:#666;text-transform:uppercase;">{{ item.sku }}</div>
+            <div style="font-size:.95rem;font-weight:700;margin:.25rem 0;">{{ item.name[:30] }}</div>
+            <img src="{{ url_for('main.qr_item', item_id=item.id) }}" width="80" height="80" alt="QR">
+            <div style="font-size:.65rem;color:#888;margin-top:.2rem;">Unit: {{ item.unit }}</div>
+        </div>
+    </div>
+    <div class="col-md-9 no-print">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            This is a <strong>consumable item</strong>. One label is generated for the item.
+            For asset/equipment items, individual unit labels with unique asset tags are shown.
+        </div>
+        <p class="text-muted">The QR code links to this item's detail page for quick lookup.</p>
+    </div>
+</div>
+{% else %}
+<div class="card p-4 text-center text-muted">
+    <i class="bi bi-tag fs-2 mb-2 d-block opacity-30"></i>
+    No asset units registered for this item yet.
+    <a href="{{ url_for('main.asset_unit_create', item_id=item.id) }}" class="d-block mt-2">Register units first</a>
+</div>
+{% endif %}
+{% endblock %}
